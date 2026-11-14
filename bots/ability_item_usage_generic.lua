@@ -5092,12 +5092,18 @@ X.ConsiderItemDesire["item_tpscroll"] = function( hItem )
 	end
 
 	-- Go complete items
+	-- Only from far away, and at most once every 90 s. When the trip cannot free a slot
+	-- (nothing combines and nothing is sellable), the bot used to teleport home again and
+	-- again, or keep channelling the TP while standing in the fountain, and looked stuck there.
 	if X.IsInvFull(bot) and X.GetNumStashItem(bot) >= 1
 	and (X.IsThereRecipeInStash(bot) or (bot:GetStashValue() >= 1000 and bot:GetGold() > 1100))
-	and (bot:GetActiveMode() ~= BOT_MODE_PUSH_TOWER_TOP or bot:GetActiveMode() ~= BOT_MODE_PUSH_TOWER_MID or bot:GetActiveMode() ~= BOT_MODE_PUSH_TOWER_BOT or bot:GetActiveMode() ~= BOT_MODE_ATTACK)
+	and nMode ~= BOT_MODE_PUSH_TOWER_TOP and nMode ~= BOT_MODE_PUSH_TOWER_MID and nMode ~= BOT_MODE_PUSH_TOWER_BOT and nMode ~= BOT_MODE_ATTACK
+	and bot:DistanceFromFountain() > nMinTPDistance
+	and DotaTime() > (bot.completeItemsTPTime or -9999) + 90
 	and not J.IsInTeamFight(bot, 1000)
 	and nEnemyCount == 0
 	then
+		bot.completeItemsTPTime = DotaTime()
 		hEffectTarget = J.GetTeamFountain()
 		sCastMotive = '撤退:1'
 
