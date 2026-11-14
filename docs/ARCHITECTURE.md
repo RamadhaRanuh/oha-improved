@@ -480,6 +480,8 @@ Some Lua files in `bots/FunLib/` are **generated from TypeScript** via TSTL. Whe
 | `FunLib/behavior/flags.lua` | `typescript/bots/FunLib/behavior/flags.ts` |
 | `FunLib/behavior/desire_tiers.lua` | `typescript/bots/FunLib/behavior/desire_tiers.ts` |
 | `FunLib/behavior/arbiter.lua` | `typescript/bots/FunLib/behavior/arbiter.ts` |
+| `FunLib/behavior/team_brain.lua` | `typescript/bots/FunLib/behavior/team_brain.ts` |
+| `FunLib/behavior/thrash.lua` | `typescript/bots/FunLib/behavior/thrash.ts` |
 
 Note: `Customize/general.ts` only re-exports `bots/Customize/general.lua`; edit the Lua file directly (it holds `Customize.Behavior`, the per-team behaviour flags).
 

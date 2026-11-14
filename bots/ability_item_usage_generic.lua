@@ -9,6 +9,7 @@ local bDebugMode = ( 10 == 10 )
 
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func' )
 local Utils = require( GetScriptDirectory()..'/FunLib/utils' )
+local Thrash = require( GetScriptDirectory()..'/FunLib/behavior/thrash' )
 local BotBuild = dofile( GetScriptDirectory().."/BotLib/"..string.gsub( botName, "npc_dota_", "" ) )
 local Localization = require( GetScriptDirectory()..'/FunLib/localization' )
 local Customize = require(GetScriptDirectory()..'/Customize/general')
@@ -8385,6 +8386,7 @@ function ItemUsageThink()
 	if bot.lastItemFrameProcessTime == nil then bot.lastItemFrameProcessTime = DotaTime() end
 	if DotaTime() > 30 and (DotaTime() - bot.lastItemFrameProcessTime < (bot.frameProcessTime * (1 + Customize.ThinkLess))) then return end
 	bot.lastItemFrameProcessTime = DotaTime()
+	Thrash.Observe(bot) -- debug thrash counter (docs/specs/smarter-bot-behaviour.md 3.2); does nothing unless Utils.DebugMode
 	if not J.IsNoItemIllution(bot) then ItemUsageComplement() end
 end
 

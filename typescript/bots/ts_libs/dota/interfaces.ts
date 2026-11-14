@@ -130,6 +130,8 @@ export interface Unit {
     WasRecentlyDamagedByCreep(delta: number): boolean;
     GetMaxHealth(): number;
     GetHealth(): number;
+    GetRawOffensivePower(): number;
+    GetOffensivePower(): number;
     GetHealthRegen(): number;
     GetMaxMana(): number;
     GetMana(): number;

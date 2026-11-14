@@ -3,7 +3,10 @@ local ____exports = {}
 local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
 local IsOn = ____flags.IsOn
 --- Added to the running mode's desire so it must be beaten clearly before it is replaced. Tunable.
-local INCUMBENT_BONUS = 0.06
+-- Was 0.06; in the S0b screen that cut mode changes by only about 13% (21.4 against 24.8 per bot
+-- per minute). 0.12 is the most it can be while a mode one tier higher (tiers are 0.15 apart
+-- from MODERATE upward) still always wins.
+local INCUMBENT_BONUS = 0.12
 --- Only a mode that still wants to run (raw above this) gets the incumbent bonus.
 local INCUMBENT_MIN_RAW = 0.1
 --- Normalises a legacy desire onto the 0..1 tier scale and applies the incumbent bonus.

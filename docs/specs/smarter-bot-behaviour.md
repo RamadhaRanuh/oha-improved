@@ -66,7 +66,7 @@ New code may interpolate between adjacent tiers with `RemapValClamped`.
 `behavior/arbiter.ts` exports `Finalize(bot, mode: BotMode, raw: number): number`. With flag `arbiter` on, every `GetDesire()` on that team returns `Finalize(bot, BOT_MODE_X, raw)`. This wraps the existing return value in each mode entry file and leaves the internals untouched.
 
 1. **Legacy values above 1 are compressed** into 0.95..0.99, keeping their order: `v > 1` becomes `0.95 + min(v - 1, 0.5) * 0.08`. Negative values become 0.
-2. **Incumbent bonus.** If `bot:GetActiveMode() == mode` and `raw > 0.1`, add `0.06` (*tunable*), capped at 1. A mode that is already running then has to be beaten clearly before it is replaced, which also gives the tie-break that ryndrb's laning uses.
+2. **Incumbent bonus.** If `bot:GetActiveMode() == mode` and `raw > 0.1`, add `0.12` (*tunable*; it was 0.06 until the S0b screen, see section 12), capped at 1. A mode that is already running then has to be beaten clearly before it is replaced, which also gives the tie-break that ryndrb's laning uses.
 3. **Thrash counter** (debug only). `Utils.DebugMode` counts active-mode changes per bot per minute and prints them once a minute. Phase 0 uses this for the baseline thrash rate.
 
 With the flag off, `Finalize` is not called.
@@ -452,6 +452,8 @@ Each session is one agent session. It ends with `npm run build` passing, the fla
 | S8 | Human feel (10.2) | `behavior/humanfeel.ts`, readers in fight, retreat and laning | Screen, confirm ("not worse"), human-played checklist |
 
 After every confirm run that passes, flip that flag's default to `true` and commit.
+
+**S0b arbiter screen, cut short by the human's decision (2026-11-14).** Two games were played, not eight. The new team won 1 of 2, and in both games the Dire side won with either lineup, which points to a side effect, not the code. Mode changes per bot per minute were 21.4 for the arbiter team against 24.8 for baseline, a steady but small cut of about 13%. Decision: raise the incumbent bonus to 0.12 and do not finish the arbiter-only screen. The S1 laning screen tests `laning` and `arbiter` together. If it fails, rerun it with `arbiter` off before blaming laning. Records: [results/s0b-arbiter-screen.jsonl](results/s0b-arbiter-screen.jsonl). Tooling: `npm run match -- <game> <flags>` sets up a screen or confirm game, and `npm run report` scores the logs.
 
 ## 13. Measurement protocol
 

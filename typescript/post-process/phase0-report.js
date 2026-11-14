@@ -122,3 +122,50 @@ report("Lua errors", errs.length ? "CHECK" : "NONE", errs.length ? `${errs.lengt
 const w = Math.max(...results.map(r => r.id.length));
 console.log(`Phase 0 report for ${logPath}\n`);
 for (const r of results) console.log(`${r.id.padEnd(w)}  ${r.status.padEnd(10)}  ${r.detail}`);
+
+// Per game (one console.<matchid>.log per match): winner, which team had flags on, thrash.
+// THRASH lines come from behavior/thrash.ts when Utils.DebugMode is on (npm run match turns it on).
+const games = [];
+for (const p of existing) {
+    const fileLines = fs.readFileSync(p, "utf8").split(/\r?\n/);
+    let rec = null;
+    for (const l of fileLines) {
+        const m = l.match(/MATCHREC (\{.*\})\s*$/);
+        if (m) { try { rec = JSON.parse(m[1]); } catch (e) { /* truncated */ } }
+    }
+    const thrash = { 2: { changes: 0, seconds: 0 }, 3: { changes: 0, seconds: 0 } };
+    for (const l of fileLines) {
+        const m = l.match(/THRASH team=(\d+) hero=\S+ changes=(\d+) seconds=(\d+)/);
+        if (m && thrash[m[1]]) { thrash[m[1]].changes += Number(m[2]); thrash[m[1]].seconds += Number(m[3]); }
+    }
+    if (rec || thrash[2].seconds || thrash[3].seconds) games.push({ file: path.basename(p), rec, thrash });
+}
+if (games.length) {
+    const on = side => (side ? Object.keys(side).filter(k => side[k] === true) : []);
+    const rate = t => (t.seconds ? (t.changes / (t.seconds / 60)).toFixed(1) : "-");
+    console.log("\nGames (thrash = mode changes per bot per minute)\n");
+    let newGames = 0, newWins = 0;
+    const thrashNew = { changes: 0, seconds: 0 }, thrashOld = { changes: 0, seconds: 0 };
+    for (const g of games) {
+        const r = g.rec;
+        const radOn = r ? on(r.flags && r.flags.radiant) : [], direOn = r ? on(r.flags && r.flags.dire) : [];
+        const newTeam = radOn.length && !direOn.length ? "radiant" : direOn.length && !radOn.length ? "dire" : null;
+        if (r && newTeam) {
+            newGames += 1;
+            if (r.winner === newTeam) newWins += 1;
+            const tNew = g.thrash[newTeam === "radiant" ? 2 : 3], tOld = g.thrash[newTeam === "radiant" ? 3 : 2];
+            thrashNew.changes += tNew.changes; thrashNew.seconds += tNew.seconds;
+            thrashOld.changes += tOld.changes; thrashOld.seconds += tOld.seconds;
+        }
+        const desc = !r ? "no MATCHREC (game not finished?)"
+            : `winner ${r.winner}, ${Math.round(r.duration / 60)} min, new: ${newTeam ? `${newTeam} (${(newTeam === "radiant" ? radOn : direOn).join(",")})` : radOn.length || direOn.length ? "both teams have flags" : "none (baseline)"}`;
+        console.log(`  ${g.file.padEnd(24)} ${desc}; thrash radiant ${rate(g.thrash[2])}, dire ${rate(g.thrash[3])}`);
+    }
+    if (newGames) {
+        console.log(`\nNew team won ${newWins} of ${newGames} game(s).` +
+            (newGames >= 32 ? (newWins >= 22 ? " Confirm rule: 22 or more of 32 -> PASS." : " Confirm rule: fewer than 22 of 32 -> not passed.")
+                : newGames >= 8 ? (newWins <= 2 ? " Screen rule: 2 or fewer of 8 -> STOP and fix." : " Screen rule: more than 2 of 8 -> go on to the confirm run.")
+                : " A screen is 8 games, a confirm run 32."));
+        console.log(`Thrash: new team ${rate(thrashNew)}, baseline team ${rate(thrashOld)} mode changes per bot per minute.`);
+    }
+}

@@ -9,8 +9,13 @@
 import { BotMode, Unit } from "bots/ts_libs/dota";
 import { IsOn } from "./flags";
 
-/** Added to the running mode's desire so it must be beaten clearly before it is replaced. Tunable. */
-const INCUMBENT_BONUS = 0.06;
+/**
+ * Added to the running mode's desire so it must be beaten clearly before it is replaced. Tunable.
+ * Was 0.06; in the S0b screen that cut mode changes by only about 13% (21.4 against 24.8 per bot
+ * per minute). 0.12 is the most it can be while a mode one tier higher (tiers are 0.15 apart
+ * from MODERATE upward) still always wins.
+ */
+const INCUMBENT_BONUS = 0.12;
 /** Only a mode that still wants to run (raw above this) gets the incumbent bonus. */
 const INCUMBENT_MIN_RAW = 0.1;
 

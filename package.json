@@ -19,6 +19,8 @@
         "dev": "tstl -p tsconfig-tstl.json --watch",
         "prettier": "prettier ./bots ./typescript --write",
         "phase0": "node ./typescript/post-process/phase0-report.js",
+        "report": "node ./typescript/post-process/phase0-report.js",
+        "match": "node ./typescript/post-process/match-setup.js",
         "update-version":"node ./typescript/post-process/update-version.js",
         "update-ne": "npm run build:node && node ./dist/post-process/static-neutrals-matchup.js",
         "neutrals": "npm run build:node && node ./dist/post-process/neutrals.js",
