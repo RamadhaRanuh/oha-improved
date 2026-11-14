@@ -27,6 +27,10 @@ local numberAnnouncePrinted      = 1
 local announcementGapSeconds     = 6
 local isChangePosMessageDone     = false
 
+-- Behaviour flag `laning` (docs/specs/smarter-bot-behaviour.md 5). Flag off: nothing below changes.
+local bLaning = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
+local Laning = bLaning and require(GetScriptDirectory()..'/FunLib/behavior/laning') or nil
+
 if Utils.BuggyHeroesDueToValveTooLazy[botName] then local_mode_laning_generic = dofile( GetScriptDirectory().."/FunLib/override_generic/mode_laning_generic" ) end
 
 function GetDesire()
@@ -77,7 +81,10 @@ function GetDesire()
 	-- 	return BOT_MODE_DESIRE_NONE
 	-- end
 
-	if bot:WasRecentlyDamagedByAnyHero(5)
+	-- Behaviour flag `laning`: trades are part of laning, and its danger step decides when to back off.
+	-- Without this, every trade the enemy answered turned laning off for 5 s.
+	if not bLaning
+	and bot:WasRecentlyDamagedByAnyHero(5)
 	and #J.Utils.GetLastSeenEnemyIdsNearLocation(bot:GetLocation(), 800) > 0 then
 		local nLaneFrontLocation = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0)
 		local nDistFromLane = GetUnitToLocationDistance(bot, nLaneFrontLocation)
@@ -93,6 +100,16 @@ function GetDesire()
 	-- if J.ShouldGoFarmDuringLaning(bot) then
 	-- 	return 0.2
 	-- end
+
+	if bLaning then
+		-- Do not pull a bot out of Valve's built-in watcher / wisdom shrine / lotus pool modes (no OHA
+		-- override files; Valve's own Think runs). Same rule as ryndrb's laning mode.
+		local nMode = bot:GetActiveMode()
+		if nMode == (BOT_MODE_WATCHER or 28) or nMode == (BOT_MODE_WISDOM_SHRINE or 29) or nMode == (BOT_MODE_LOTUS_POOL or 30) then
+			return BOT_MODE_DESIRE_NONE
+		end
+		return Laning.GetDesire(bot)
+	end
 
 	if local_mode_laning_generic or (J.GetPosition(bot) == 1 and J.IsPosxHuman(5)) then
 		-- last hit
@@ -215,6 +232,9 @@ if local_mode_laning_generic or (J.GetPosition(bot) == 1 and J.IsPosxHuman(5)) t
 	end
 end
 
+if bLaning then
+	function Think() Laning.Think(bot) end
+end
 
 function PickOneAnnouncer()
 	if not hasPickedOneAnnouncer then

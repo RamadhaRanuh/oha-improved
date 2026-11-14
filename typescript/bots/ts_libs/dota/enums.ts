@@ -32,6 +32,9 @@ export declare enum BotScriptEnums {
     BOT_MODE_ROSHAN,
     BOT_MODE_ITEM,
     BOT_MODE_WARD,
+    BOT_MODE_WATCHER,
+    BOT_MODE_WISDOM_SHRINE,
+    BOT_MODE_LOTUS_POOL,
     // Action Desires
     // These can be useful for making sure all action desires are using a common language for talking about their desire.
     BOT_ACTION_DESIRE_NONE,
@@ -456,6 +459,10 @@ export enum BotMode {
     Roshan = BotScriptEnums.BOT_MODE_ROSHAN || 20,
     Item = BotScriptEnums.BOT_MODE_ITEM || 21,
     Ward = BotScriptEnums.BOT_MODE_WARD || 22,
+    // Valve built-in modes with no OHA override file (Valve's own Think runs).
+    Watcher = BotScriptEnums.BOT_MODE_WATCHER || 28,
+    WisdomShrine = BotScriptEnums.BOT_MODE_WISDOM_SHRINE || 29,
+    LotusPool = BotScriptEnums.BOT_MODE_LOTUS_POOL || 30,
 }
 
 export enum Team {

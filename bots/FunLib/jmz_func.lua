@@ -6512,6 +6512,8 @@ function J.CheckBotIdleState()
 
 	local bot = GetBot()
 	if not bot:IsAlive() then return false end
+	-- Behaviour flag `laning`: a bot holding its lane position is not stuck (set by behavior/laning).
+	if bot.laningHoldUntil ~= nil and DotaTime() < bot.laningHoldUntil then return false end
 
 	local botName = bot:GetUnitName();
 	local botId = bot:GetPlayerID();
@@ -6543,9 +6545,9 @@ function J.CheckBotIdleState()
 					-- Should send it to most desire farming lane, if in laning or send it to desire push lane.
 					local frontLoc = GetLaneFrontLocation(GetTeam(), bot:GetAssignedLane(), 0);
 					bot:ActionQueue_AttackMove(frontLoc)
-					print('[ERROR] Relocating the idle bot: '..botName..'. Sending it to the lane# it was originally assigned: '..tostring(bot:GetAssignedLane()))
+					print('[ERROR] Relocating the idle bot: '..botName..'. Sending it to the lane# it was originally assigned: '..tostring(bot:GetAssignedLane())..' mode='..tostring(botMode)..' action='..tostring(bot:GetCurrentActionType()))
 				else
-					print('Bot '..botName..' is in idle state for unknown reasons. N/A.')
+					print('Bot '..botName..' is in idle state for unknown reasons. N/A. mode='..tostring(botMode)..' action='..tostring(bot:GetCurrentActionType()))
 				end
 				return true
 			else

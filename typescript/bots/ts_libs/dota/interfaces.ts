@@ -42,6 +42,8 @@ export interface Unit {
     DefendLaneDesire: number[] | null;
     laneToDefend: Lane;
     stateTetheredHero: Unit | null;
+    /** Set by behavior/laning Think: until this DotaTime, jmz CheckBotIdleState leaves the bot alone. */
+    laningHoldUntil: number | null;
 
     IsNull(): boolean;
 
@@ -117,6 +119,20 @@ export interface Unit {
     Action_UseAbility(ability: Ability): void;
     Action_MoveToLocation(location: Vector): void;
     Action_AttackUnit(unit: Unit, once: boolean): void;
+    Action_UseAbilityOnTree(ability: Ability | Item, tree: number): void;
+    GetNearbyTrees(radius: number): number[];
+    GetAttackPoint(): number;
+    GetSecondsPerAttack(): number;
+    GetEstimatedDamageToTarget(currentlyAvailable: boolean, target: Unit, duration: number, damageType: number): number;
+    IsFacingLocation(location: Vector, degrees: number): boolean;
+    IsUsingAbility(): boolean;
+    IsChanneling(): boolean;
+    IsDisarmed(): boolean;
+    /** OHA override (aba_global_overrides): the engine's max health, unaffected by script tweaks. */
+    OriginalGetMaxHealth(): number;
+    /** OHA override (aba_global_overrides): the engine's health, unaffected by script tweaks. */
+    OriginalGetHealth(): number;
+    GetItemSlotType(slot: number): number;
 
     GetAttackTarget(): Unit | null;
     GetTarget(): Unit | null;
@@ -126,6 +142,7 @@ export interface Unit {
 
     GetLastAttackTime(): number;
     WasRecentlyDamagedByAnyHero(delta: number): boolean;
+    WasRecentlyDamagedByHero(hero: Unit, delta: number): boolean;
     WasRecentlyDamagedByTower(delta: number): boolean;
     WasRecentlyDamagedByCreep(delta: number): boolean;
     GetMaxHealth(): number;
@@ -138,6 +155,9 @@ export interface Unit {
     GetManaRegen(): number;
 
     GetLevel(): number;
+    /** Game totals (scoreboard). */
+    GetLastHits(): number;
+    GetDenies(): number;
     IsAncientCreep(): boolean;
     HasModifier(modifierName: string): boolean;
     GetActiveMode(): number;

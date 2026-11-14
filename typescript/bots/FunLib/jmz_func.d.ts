@@ -68,6 +68,22 @@ declare function GetHeroesNearLocation(enemy: boolean, location: Vector, radius:
 
 declare function CanBeAttacked(unit: Unit): boolean;
 
+/** Whether `damage` landing after `delay` seconds kills `target`, counting attacks already on their way (and not if those alone kill it first). */
+declare function WillKillTarget(target: Unit, damage: number, damageType: number, delay: number): boolean;
+
+/** Seconds until an attack from `bot` would land on `creep`: attack point, remaining backswing, projectile travel and the walk into range. */
+declare function GetAttackProDelayTime(bot: Unit, creep: Unit): number;
+
+/** Item slot of `itemName` in the main inventory (not the backpack), or -1. */
+declare function FindItemSlotNotInNonbackpack(bot: Unit, itemName: string): number;
+
+declare function IsAttacking(unit: Unit): boolean;
+
+/** Damage from attacks already mid-swing or in flight that will land on `unit` within `seconds` (creep and tower attacks). */
+declare function GetTotalAttackWillRealDamage(unit: Unit, seconds: number): number;
+
+declare function GetCoresAverageNetworth(): number;
+
 declare function IsSuspiciousIllusion(unit: Unit): boolean;
 declare function IsEarlyGame(): boolean;
 declare function IsMidGame(): boolean;

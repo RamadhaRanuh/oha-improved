@@ -35,6 +35,8 @@ export interface GameState {
     recentDefendTime: number;
     cachedVars: any;
     twinGates: Unit[];
+    /** Set by laning GetDesire once laning is over (read by other modes). */
+    passiveLaningTime?: boolean;
 }
 
 export interface AvoidanceZone {

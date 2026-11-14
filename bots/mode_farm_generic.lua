@@ -10,6 +10,7 @@ local Customize = require( GetScriptDirectory()..'/Customize/general' )
 local bot = GetBot();
 local X = {}
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func')
+local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
 local RB = Vector(-7174.000000, -6671.00000, 0.000000)
 local DB = Vector(7023.000000, 6450.000000, 0.000000)
 
@@ -978,6 +979,9 @@ function X.ShouldRun(bot)
 		and DotaTime() > 30
 		and DotaTime() < 8 * 60
 		and enemyFountainDistance < 8111
+		-- Behaviour flag `laning`: a harass hit from laning is not a chase. Without this, every trade handed
+		-- the bot to this run for 2.88 s (S1 cross-bot game: Juggernaut 51% 'farm' at 1:00-2:00).
+		and not (bLaningFlag and botMode == BOT_MODE_LANING)
 	then
 		if botTarget ~= nil and botTarget:IsHero()
 		   and J.GetHP(botTarget) > 0.35

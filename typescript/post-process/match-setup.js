@@ -1,6 +1,8 @@
 // Sets up one measurement game (docs/specs/smarter-bot-behaviour.md section 13).
 //
 //   npm run match -- <game> <flag>[,<flag>...]   e.g.  npm run match -- 3 arbiter
+//   npm run match -- play <flag>[,<flag>...]     human-vs-bot feel game: flags on BOTH teams, heroes untouched
+//   npm run match -- play none                   same, every flag off (baseline OHA with debug prints)
 //   npm run match -- reset                       put general.lua and utils.lua back as they were
 //
 // <game> is 1..32: game n plays lineup pair ceil(n/4) in rotation ((n-1) % 4) + 1, so a
@@ -39,6 +41,35 @@ if (args[0] === "reset") {
             console.log(`No backup for ${path.relative(root, p)}, left as it is`);
         }
     }
+    process.exit(0);
+}
+
+const parseFlags = arg => {
+    if (arg === "none") return []; // "play none": every flag off (baseline OHA), debug prints on
+    const on = (arg || "").split(",").map(s => s.trim()).filter(Boolean);
+    if (!on.length) fail(`Name the flags, e.g. "arbiter". Known: ${FLAGS.join(", ")}`);
+    for (const f of on) if (!FLAGS.includes(f)) fail(`Unknown flag "${f}". Known: ${FLAGS.join(", ")}`);
+    return on;
+};
+const setDebugMode = () => {
+    const utils = fs.readFileSync(utilsPath, "utf8");
+    if (!/____exports\.DebugMode = (true|false)/.test(utils)) fail("Could not find DebugMode in bots/FunLib/utils.lua");
+    fs.writeFileSync(utilsPath, utils.replace(/____exports\.DebugMode = (true|false)/, "____exports.DebugMode = true"));
+};
+
+if (args[0] === "play") {
+    const on = parseFlags(args[1]);
+    for (const p of [generalPath, utilsPath]) if (!fs.existsSync(backup(p))) fs.copyFileSync(p, backup(p));
+    let text = fs.readFileSync(generalPath, "utf8");
+    const nl = text.includes("\r\n") ? "\r\n" : "\n";
+    const row = FLAGS.map(f => `${f} = ${on.includes(f)}`).join(", ");
+    const re = /Customize\.Behavior = \{[\s\S]*?\n\}/;
+    if (!re.test(text)) fail("Could not find Customize.Behavior in general.lua");
+    text = text.replace(re, `Customize.Behavior = {${nl}    Radiant = { ${row} },${nl}    Dire    = { ${row} },${nl}}`);
+    fs.writeFileSync(generalPath, text);
+    setDebugMode();
+    console.log(`Play setup: flags on both teams (${on.length ? on.join(", ") : "none: baseline OHA"}); heroes as in general.lua. Debug prints on.`);
+    console.log("When done: npm run match -- reset");
     process.exit(0);
 }
 

@@ -1,6 +1,7 @@
 local X = {}
 
 local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
+local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
 local Customize = require(GetScriptDirectory()..'/Customize/general')
 
 local bot = GetBot()
@@ -260,7 +261,10 @@ function GetDesireHelper()
         end
     end
 
-    if J.IsInLaningPhase() or botHP < 0.35 then
+    -- Behaviour flag `laning`: while laning mode is active and health is fine, laning handles creep
+    -- aggro itself (it steps back after a trade); this retreat took over after every harass hit.
+    if (J.IsInLaningPhase() or botHP < 0.35)
+    and not (bLaningFlag and botActiveMode == BOT_MODE_LANING and botHP >= 0.5) then
         local creepDamage = 0
         local nEnemyCreeps = bot:GetNearbyCreeps(1200, true)
         for _, creep in pairs(nEnemyCreeps) do
@@ -533,6 +537,8 @@ function X.ShouldRun()
 		and DotaTime() > 30
 		and DotaTime() < 8 * 60
 		and enemyFountainDistance < 8111
+		-- Behaviour flag `laning`: a harass hit from laning is not a chase (same rule as mode_farm_generic).
+		and not (bLaningFlag and botMode == BOT_MODE_LANING)
 	then
 		if botTarget ~= nil and botTarget:IsHero()
 		   and J.GetHP(botTarget) > 0.35

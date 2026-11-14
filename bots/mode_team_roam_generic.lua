@@ -11,6 +11,10 @@ local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
 local Item = require(GetScriptDirectory()..'/FunLib/aba_item')
 local Roles = require(GetScriptDirectory()..'/FunLib/aba_role')
 local AttackSpecialUnit = dofile(GetScriptDirectory()..'/FunLib/aba_special_units')
+-- Behaviour flag `laning`: during the laning phase, laning owns last hits (spec 5.5).
+local bLaningOwnsCreeps = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
+local HELP_CORE_DWELL = 3
+local helpCoreUntil, helpCoreTarget = -999, nil
 
 local X = {}
 local team = GetTeam()
@@ -109,6 +113,17 @@ function GetDesireHelper()
 
     local target
     target, ShouldHelpWhenCoreIsTargeted = X.ConsiderHelpWhenCoreIsTargeted()
+    -- Behaviour flag `laning`: in the laning phase, keep helping the core for HELP_CORE_DWELL s once started.
+    -- Lane harass toggles the trigger every few seconds; without the dwell supports flipped laning <-> team roam
+    -- 20+ times a minute (S1 playtest 3).
+    if bLaningOwnsCreeps and J.IsInLaningPhase() then
+        if ShouldHelpWhenCoreIsTargeted then
+            helpCoreUntil, helpCoreTarget = DotaTime() + HELP_CORE_DWELL, target
+        elseif DotaTime() < helpCoreUntil and J.IsValidHero(helpCoreTarget) and J.CanBeAttacked(helpCoreTarget)
+        and GetUnitToUnitDistance(bot, helpCoreTarget) <= 1600 then
+            target, ShouldHelpWhenCoreIsTargeted = helpCoreTarget, true
+        end
+    end
     if ShouldHelpWhenCoreIsTargeted then
         SetStickyTarget(target)
         targetUnit = target
@@ -126,6 +141,7 @@ function GetDesireHelper()
     end
 
 	hTargetCreep = X.GetLastHitCreep()
+	if bLaningOwnsCreeps and J.IsInLaningPhase() then hTargetCreep = nil end
 	if J.IsValid(hTargetCreep) and J.CanBeAttacked(hTargetCreep) then
 		return 1.5
 	end
