@@ -15,10 +15,38 @@
  *     MODES team=2 hero=npc_dota_hero_axe laning=62% attack=20% ... top=laning>attack:9,attack>laning:8
  */
 import * as Utils from "bots/FunLib/utils";
-import { BotMode, Unit } from "bots/ts_libs/dota";
+import { BotMode, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import { DescribeForDebug } from "./team_brain";
 
 const REPORT_EVERY = 60; // game seconds
+
+// Lotus pool spots, as ryndrb defines them (mode_team_roam_generic.lua). Unverified for 7.41.
+const LOTUS_POOLS: [string, Vector][] = [
+    ["radiant", Vector(7515, -4423, 128)],
+    ["dire", Vector(-7562, 4219, 128)],
+];
+
+/**
+ * Debug: what is standing at each lotus pool spot. Bots never entered Valve's lotus pool mode in our
+ * games; this shows what the pool is to the bot API and when it holds lotuses.
+ *     LOTUS team=2 pool=radiant units=npc_dota_xxx(team4,hp100),...
+ */
+function DescribeLotusPools(): string {
+    const parts: string[] = [];
+    const all = GetUnitList(UnitType.All);
+    for (const [name, loc] of LOTUS_POOLS) {
+        const here: string[] = [];
+        for (const unit of all) {
+            if (unit === null || unit === undefined || unit.IsNull()) continue;
+            const d = unit.GetLocation();
+            if ((d.x - loc.x) * (d.x - loc.x) + (d.y - loc.y) * (d.y - loc.y) <= 700 * 700) {
+                here.push(`${unit.GetUnitName()}(team${unit.GetTeam()},hp${unit.GetHealth()})`);
+            }
+        }
+        parts.push(`pool=${name} visible=${IsLocationVisible(loc)} units=${here.join(",")}`);
+    }
+    return parts.join(" | ");
+}
 
 interface Track {
     mode: number;
@@ -93,5 +121,6 @@ export function Observe(bot: Unit): void {
     if (last === undefined || now - last >= REPORT_EVERY) {
         brainReportAt[team] = now;
         print(`BRAIN team=${team} ${DescribeForDebug()}`);
+        print(`LOTUS team=${team} t=${Math.floor(now)} ${DescribeLotusPools()}`);
     }
 }

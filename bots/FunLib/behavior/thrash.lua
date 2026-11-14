@@ -43,9 +43,53 @@ local ____exports = {}
 local Utils = require(GetScriptDirectory().."/FunLib/utils")
 local ____dota = require(GetScriptDirectory().."/ts_libs/dota/index")
 local BotMode = ____dota.BotMode
+local UnitType = ____dota.UnitType
 local ____team_brain = require(GetScriptDirectory().."/FunLib/behavior/team_brain")
 local DescribeForDebug = ____team_brain.DescribeForDebug
 local REPORT_EVERY = 60
+local LOTUS_POOLS = {
+    {
+        "radiant",
+        Vector(7515, -4423, 128)
+    },
+    {
+        "dire",
+        Vector(-7562, 4219, 128)
+    }
+}
+--- Debug: what is standing at each lotus pool spot. Bots never entered Valve's lotus pool mode in our
+-- games; this shows what the pool is to the bot API and when it holds lotuses.
+--     LOTUS team=2 pool=radiant units=npc_dota_xxx(team4,hp100),...
+local function DescribeLotusPools()
+    local parts = {}
+    local all = GetUnitList(UnitType.All)
+    for ____, ____value in ipairs(LOTUS_POOLS) do
+        local name = ____value[1]
+        local loc = ____value[2]
+        local here = {}
+        for ____, unit in ipairs(all) do
+            do
+                local __continue4
+                repeat
+                    if unit == nil or unit == nil or unit:IsNull() then
+                        __continue4 = true
+                        break
+                    end
+                    local d = unit:GetLocation()
+                    if (d.x - loc.x) * (d.x - loc.x) + (d.y - loc.y) * (d.y - loc.y) <= 700 * 700 then
+                        here[#here + 1] = ((((unit:GetUnitName() .. "(team") .. tostring(unit:GetTeam())) .. ",hp") .. tostring(unit:GetHealth())) .. ")"
+                    end
+                    __continue4 = true
+                until true
+                if not __continue4 then
+                    break
+                end
+            end
+        end
+        parts[#parts + 1] = (((("pool=" .. name) .. " visible=") .. tostring(IsLocationVisible(loc))) .. " units=") .. table.concat(here, ",")
+    end
+    return table.concat(parts, " | ")
+end
 local function ModeName(mode)
     local name = BotMode[mode]
     return name ~= nil and string.lower(name) or tostring(mode)
@@ -128,6 +172,7 @@ function ____exports.Observe(bot)
     if last == nil or now - last >= REPORT_EVERY then
         brainReportAt[team] = now
         print((("BRAIN team=" .. tostring(team)) .. " ") .. DescribeForDebug())
+        print((((("LOTUS team=" .. tostring(team)) .. " t=") .. tostring(math.floor(now))) .. " ") .. DescribeLotusPools())
     end
 end
 return ____exports
