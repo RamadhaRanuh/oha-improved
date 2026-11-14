@@ -18,6 +18,7 @@ local SentryWard = nil
 
 local hTargetSpot = nil
 local fLastWardPlantTime = -math.huge
+local Alone = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/alone') or nil
 
 function GetDesire()
 	if J.GetPosition(bot) <= 3 then return false end
@@ -26,6 +27,10 @@ function GetDesire()
 	-- if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
 	local res = GetDesireHelper()
 	-- J.Utils.SetCachedVars(cacheKey, res)
+	-- Behaviour flag `group`: no lone warding in the enemy half while enemies are missing (behavior/alone).
+	if Alone ~= nil and res > 0 and hTargetSpot ~= nil and Alone.Risky(bot, hTargetSpot.location, 'ward') then
+		return BOT_MODE_DESIRE_NONE
+	end
 	return RemapValClamped(J.GetHP(bot) * res, 0, 1, BOT_MODE_DESIRE_NONE, res)
 end
 function GetDesireHelper()

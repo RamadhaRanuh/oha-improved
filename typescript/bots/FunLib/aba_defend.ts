@@ -12,6 +12,10 @@ import Customize = require("bots/Customize/general");
 import { Barracks, BotActionDesire, BotMode, BotModeDesire, Lane, Team, Tower, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import { add } from "bots/ts_libs/utils/native-operators";
 import { GetLocationToLocationDistance } from "./utils";
+import { IsOn } from "./behavior/flags";
+import * as Alone from "./behavior/alone";
+import * as Group from "./behavior/group";
+import { DesireTier } from "./behavior/desire_tiers";
 
 Customize.ThinkLess = Customize.Enable ? Customize.ThinkLess : 1;
 
@@ -607,8 +611,21 @@ export function GetDefendDesire(bot: Unit, lane: Lane): BotModeDesire {
     //     return cachedVar;
     // }
 
+    // Behaviour flag `group`: the team picks who defends a tower against heroes (behavior/group). Picked bots
+    // still meeting go there through team roam; bots not picked stay out; picked and met: at least HIGH.
+    let role: Group.DefendRole = "none";
+    if (IsOn("group")) {
+        role = Group.DefendRoleOf(bot, lane);
+        if (role === "skip" || role === "gather") {
+            (bot as any).defendDesire = BotModeDesire.VeryLow;
+            return BotModeDesire.VeryLow;
+        }
+    }
+
     // 2) compute and publish
-    const res = GetDefendDesireHelper(bot, lane);
+    let res = GetDefendDesireHelper(bot, lane);
+    if (role === "defend") res = math.max(res, DesireTier.HIGH) as BotModeDesire;
+    if (role === "defend_forced") res = math.max(res, DesireTier.FORCED) as BotModeDesire;
     // jmz.Utils.SetCachedVars(cacheKey, res);
     (bot as any).defendDesire = res;
     return res;
@@ -631,6 +648,12 @@ export function GetDefendDesireHelper(bot: Unit, lane: Lane): BotModeDesire {
     const ds = getDefendState(bot);
     ds.defendLoc = locationState.laneFronts[lane];
     const distanceToDefendLoc = GetUnitToLocationDistance(bot, ds.defendLoc);
+
+    // Behaviour flag `group`: no lone defence of an outer tower against 2+ enemies (behavior/alone).
+    // (Only when behavior/group has no defence for this lane: creep-only threats.)
+    if (IsOn("group") && distanceToDefendLoc > 1200 && Group.DefendRoleOf(bot, lane) === "none" && Alone.DefendAlone(bot, ds.defendLoc)) {
+        return BotModeDesire.VeryLow;
+    }
 
     // -- 如果不在当前线上，且等级低，不防守
     const botLevel = bot.GetLevel();

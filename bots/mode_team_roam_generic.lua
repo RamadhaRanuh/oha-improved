@@ -13,6 +13,37 @@ local Roles = require(GetScriptDirectory()..'/FunLib/aba_role')
 local AttackSpecialUnit = dofile(GetScriptDirectory()..'/FunLib/aba_special_units')
 -- Behaviour flag `laning`: during the laning phase, laning owns last hits (spec 5.5).
 local bLaningOwnsCreeps = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
+-- Lane trade / step-out bursts (behavior/laning): team roam runs them so Valve's laning Think can keep laning.
+local Laning = bLaningOwnsCreeps and require(GetScriptDirectory()..'/FunLib/behavior/laning') or nil
+local bLaneBurst = false
+-- Lotus pool pickup (behavior/lotus): Valve's lotus pool mode never ran in our games.
+local Lotus = bLaningOwnsCreeps and require(GetScriptDirectory()..'/FunLib/behavior/lotus') or nil
+local bLotus = false
+
+-- Smoke ganks and counter-gank TPs (behavior/gank, flag `roam`), stacking (behavior/camps, flag `farm`).
+local Flags = require(GetScriptDirectory()..'/FunLib/behavior/flags')
+local Gank = Flags.IsOn('roam') and require(GetScriptDirectory()..'/FunLib/behavior/gank') or nil
+local Camps = Flags.IsOn('farm') and require(GetScriptDirectory()..'/FunLib/behavior/camps') or nil
+local sHumanMode = nil -- 'tp' | 'gank' | 'stack' | 'group' while one of them owns this mode
+-- Behaviour flag `fight`: after the laning phase hero targets belong to behavior/fight (spec 6.4).
+local Fight = Flags.IsOn('fight') and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
+local function FightOwnsHeroes() return Fight ~= nil and Fight.OwnsHeroTargets() end
+-- Behaviour flag `group`: walk to a defence or push meeting point, or back to the regrouping team (behavior/group).
+local Group = Flags.IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/group') or nil
+-- Behaviour modules run under pcall: a bug in one must not take down the whole mode, and Valve's
+-- console only prints "error in error handling" for errors here, so print the real message (once each).
+local tBehaviorErrors = {}
+local function SafeCall(sName, fn, ...)
+	local ok, res = pcall(fn, ...)
+	if ok then return res end
+	local sMsg = tostring(res)
+	if not tBehaviorErrors[sMsg] then
+		tBehaviorErrors[sMsg] = true
+		print('BEHAVIOR_ERROR '..sName..' team='..GetTeam()..' t='..math.floor(DotaTime())..' '..sMsg)
+	end
+	return nil
+end
+
 local HELP_CORE_DWELL = 3
 local helpCoreUntil, helpCoreTarget = -999, nil
 
@@ -65,6 +96,8 @@ local function SetStickyTarget(t)
     targetLockUntil = DotaTime() + TARGET_LOCK_SEC
 end
 
+local FIGHT_YIELD = 0.3 -- team roam cap while the bot is in a fight (tunable)
+
 local function CapForLanePush(desire)
     -- keep "team roam" from overpowering laning/pushing micro
     if J.IsInLaningPhase() or J.IsPushing(bot) then
@@ -80,6 +113,15 @@ function GetDesire()
 
     local res = GetDesireHelper()
     res = CapForLanePush(res)
+
+    -- Behaviour flag `fight`: while this bot is in an engagement (engage, hold or disengage), attack and
+    -- retreat decide. 9089836233: Pudge stayed in team roam (gank) from 56% to 19% health while retreat
+    -- asked 0.88 to disengage (death 19:47), Jakiro with 5 enemies on him while retreat asked 0.96
+    -- (death 23:38): team roam with the running-mode bonus beat both.
+    if Fight ~= nil and res > FIGHT_YIELD then
+        local f = SafeCall('fight', Fight.FightOf, bot)
+        if f ~= nil and f.state ~= 'none' then res = FIGHT_YIELD end
+    end
 
     -- J.Utils.SetCachedVars(cacheKey, res)
     return res
@@ -110,9 +152,22 @@ function GetDesireHelper()
     end
 
     ItemOpsDesire()
+    bLaneBurst = false
+    bLotus = false
+    sHumanMode = nil
+
+    -- A TP to a ganked ally: while channeling nothing else may give an order.
+    if Gank ~= nil then
+        local nTp = SafeCall('tp', Gank.TpDesire, bot) or 0
+        if nTp > 0 then
+            sHumanMode = 'tp'
+            return nTp
+        end
+    end
 
     local target
     target, ShouldHelpWhenCoreIsTargeted = X.ConsiderHelpWhenCoreIsTargeted()
+    if FightOwnsHeroes() then target, ShouldHelpWhenCoreIsTargeted = nil, false end
     -- Behaviour flag `laning`: in the laning phase, keep helping the core for HELP_CORE_DWELL s once started.
     -- Lane harass toggles the trigger every few seconds; without the dwell supports flipped laning <-> team roam
     -- 20+ times a minute (S1 playtest 3).
@@ -134,14 +189,60 @@ function GetDesireHelper()
     nearbyEnemies = J.GetEnemiesNearLoc(bot:GetLocation(), 2000)
 
     target, ShouldHelpAlly = ConsiderHelpAlly()
+    if FightOwnsHeroes() then target, ShouldHelpAlly = nil, false end
     if ShouldHelpAlly then
         SetStickyTarget(target)
         targetUnit = target
         return RemapValClamped(J.GetHP(bot), 0, 0.6, BOT_MODE_DESIRE_NONE, 0.98)
     end
 
+	if Group ~= nil then
+		local nGather = SafeCall('group', Group.GatherDesire, bot) or 0
+		if nGather > 0 then
+			sHumanMode = 'group'
+			return nGather
+		end
+	end
+	if Gank ~= nil then
+		local nGank = SafeCall('gank', Gank.GankDesire, bot) or 0
+		if nGank > 0 then
+			sHumanMode = 'gank'
+			return nGank
+		end
+	end
+	if Group ~= nil then
+		local nRegroup = SafeCall('group', Group.RegroupDesire, bot) or 0
+		if nRegroup > 0 then
+			sHumanMode = 'group'
+			return nRegroup
+		end
+	end
+	if Camps ~= nil and not (J.IsInLaningPhase() and Laning ~= nil and Laning.PullActive(bot)) then
+		local nStack = SafeCall('stack', Camps.StackDesire, bot) or 0
+		if nStack > 0 then
+			sHumanMode = 'stack'
+			return nStack
+		end
+	end
+
+	-- A camp pull already under way finishes first (test 9089581778: lotus trips kept pulling CM off pulls).
+	if Lotus ~= nil and not (J.IsInLaningPhase() and Laning.PullActive(bot)) then
+		local nLotus = Lotus.Desire(bot)
+		if nLotus > 0 then
+			bLotus = true
+			return nLotus
+		end
+	end
+
 	hTargetCreep = X.GetLastHitCreep()
-	if bLaningOwnsCreeps and J.IsInLaningPhase() then hTargetCreep = nil end
+	if bLaningOwnsCreeps and J.IsInLaningPhase() then
+		hTargetCreep = nil
+		local nBurst = Laning.BurstDesire(bot)
+		if nBurst > 0 then
+			bLaneBurst = true
+			return nBurst
+		end
+	end
 	if J.IsValid(hTargetCreep) and J.CanBeAttacked(hTargetCreep) then
 		return 1.5
 	end
@@ -179,6 +280,7 @@ function GetDesireHelper()
     elseif #nearbyAllies >= #nearbyEnemies then
         if IsHeroCore then
             local botTarget, targetDesire = X.CarryFindTarget()
+            if botTarget ~= nil and FightOwnsHeroes() and botTarget:IsHero() then botTarget = nil end
             if botTarget ~= nil then
                 targetUnit = botTarget
                 bot:SetTarget(botTarget)
@@ -187,6 +289,7 @@ function GetDesireHelper()
         end
         if IsSupport then
             local botTarget, targetDesire = X.SupportFindTarget()
+            if botTarget ~= nil and FightOwnsHeroes() and botTarget:IsHero() then botTarget = nil end
             if botTarget ~= nil then
                 targetUnit = botTarget
                 bot:SetTarget(botTarget)
@@ -309,7 +412,31 @@ end
 -- Think
 -- ==============================
 function Think()
+	if sHumanMode == 'tp' then
+		SafeCall('tp', Gank.TpThink, bot) -- gives no order while channeling
+		return
+	end
     if J.CanNotUseAction(bot) then return end
+	if sHumanMode == 'gank' then
+		SafeCall('gank', Gank.GankThink, bot)
+		return
+	end
+	if sHumanMode == 'stack' then
+		SafeCall('stack', Camps.StackThink, bot)
+		return
+	end
+	if sHumanMode == 'group' then
+		SafeCall('group', Group.Think, bot)
+		return
+	end
+	if bLaneBurst then
+		Laning.BurstThink(bot)
+		return
+	end
+	if bLotus then
+		Lotus.Think(bot)
+		return
+	end
 	-- diabled think less to avoid failing to last hit
     -- if J.Utils.IsBotThinkingMeaningfulAction(bot, Customize.ThinkLess, "team_roam") then return end
 

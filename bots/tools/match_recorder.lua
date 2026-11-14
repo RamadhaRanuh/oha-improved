@@ -13,6 +13,8 @@ At post-game it prints one line, prefixed "MATCHREC ", with a JSON record:
   duration game seconds (clock time, pre-game excluded)
   flags    Customize.Behavior per team, as read from bots/Customize/general.lua
   lineup   hero internal names per team, in team slot order
+  humans   heroes played by people (not bots), per team; empty in bot-only games
+  kda      [kills, deaths, assists] per hero at the end
   kills    team kills, at "10" (10:00), "20" (20:00) and "end"
   towers   enemy towers destroyed BY each team, at "10", "20" and "end"
            (counted from tower deaths seen after the recorder loaded)
@@ -126,6 +128,35 @@ local function lineup()
 	return res
 end
 
+-- Heroes played by people (not bots), per team: human-vs-bot games.
+local function humans()
+	local res = {}
+	for _, team in ipairs({ RADIANT, DIRE }) do
+		local heroes = { __array = true }
+		for _, id in ipairs(playerIdsOf(team)) do
+			if not PlayerResource:IsFakeClient(id) then
+				table.insert(heroes, PlayerResource:GetSelectedHeroName(id) or '')
+			end
+		end
+		res[teamKey(team)] = heroes
+	end
+	return res
+end
+
+-- Kills / deaths / assists per hero at the end.
+local function kda()
+	local res = {}
+	for _, team in ipairs({ RADIANT, DIRE }) do
+		for _, id in ipairs(playerIdsOf(team)) do
+			local name = PlayerResource:GetSelectedHeroName(id)
+			if name ~= nil and name ~= '' then
+				res[name] = { __array = true, PlayerResource:GetKills(id) or 0, PlayerResource:GetDeaths(id) or 0, PlayerResource:GetAssists(id) or 0 }
+			end
+		end
+	end
+	return res
+end
+
 local function netWorthByTeam()
 	local res = {}
 	for _, team in ipairs({ RADIANT, DIRE }) do
@@ -224,6 +255,8 @@ function R:PrintRecord()
 		duration = math.floor(gameTime()),
 		flags = readFlags(),
 		lineup = lineup(),
+		humans = humans(),
+		kda = kda(),
 		kills = { ['10'] = snapField(10, 'kills'), ['20'] = snapField(20, 'kills'), ['end'] = killsByTeam() },
 		towers = { ['10'] = snapField(10, 'towers'), ['20'] = snapField(20, 'towers'), ['end'] = towersByTeam() },
 		nw10 = snapField(10, 'nw'),

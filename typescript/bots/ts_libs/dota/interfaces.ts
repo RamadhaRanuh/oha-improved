@@ -2,7 +2,7 @@
  * The Dota2 bot scriping interfaces from Valve. https://developer.valvesoftware.com/wiki/Dota_Bot_Scripting
  */
 
-import { BotActionType, BotMode, DamageType, Lane, Team } from "./enums";
+import { BotActionType, BotMode, DamageType, Lane, Rune, Team } from "./enums";
 
 export interface Location {}
 
@@ -24,6 +24,7 @@ export interface Ping {
 
 export interface Item {
     GetName(): string;
+    GetCurrentCharges(): number;
     GetCooldownTimeRemaining(): number;
 }
 
@@ -42,7 +43,8 @@ export interface Unit {
     DefendLaneDesire: number[] | null;
     laneToDefend: Lane;
     stateTetheredHero: Unit | null;
-    /** Set by behavior/laning Think: until this DotaTime, jmz CheckBotIdleState leaves the bot alone. */
+    /** Set by behavior/laning during a lane trade/step-out burst: until this DotaTime, jmz CheckBotIdleState
+     * leaves the bot alone and the retreat/farm "should run" rules do not read the trade as a chase. */
     laningHoldUntil: number | null;
 
     IsNull(): boolean;
@@ -117,8 +119,11 @@ export interface Unit {
     Action_UseAbilityOnLocation(ability: Ability | Item, location: Location): void;
 
     Action_UseAbility(ability: Ability): void;
+    Action_ClearActions(stop: boolean): void;
     Action_MoveToLocation(location: Vector): void;
     Action_AttackUnit(unit: Unit, once: boolean): void;
+    Action_PickUpRune(rune: Rune): void;
+    Action_MoveToUnit(unit: Unit): void;
     Action_UseAbilityOnTree(ability: Ability | Item, tree: number): void;
     GetNearbyTrees(radius: number): number[];
     GetAttackPoint(): number;
@@ -174,6 +179,9 @@ export interface Unit {
     GetCurrentMovementSpeed(): number;
     GetAssignedLane(): Lane;
     ActionImmediate_Chat(message: string, globalChat: boolean): void;
+    ActionImmediate_PurchaseItem(itemName: string): number;
+    ActionImmediate_SwapItems(slot1: number, slot2: number): void;
+    DistanceFromFountain(): number;
 
     /** @param pingType Ping type, "!" if false, "X" otherwise, essentially works as ALT key */
     ActionImmediate_Ping(xCoord: number, yCoord: number, pingType: boolean): void;

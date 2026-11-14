@@ -32,6 +32,7 @@ declare function CanNotUseAction(bot: Unit): boolean;
 declare function GetMP(bot: Unit): number;
 
 declare function GetHP(bot: Unit): number;
+declare function IsModeTurbo(): boolean;
 declare function GetTeamFountain(): Vector;
 
 declare function GetMostDefendLaneDesire(): LuaMultiReturn<[Lane, number]>;
@@ -63,6 +64,8 @@ declare function IsPingCloseToValidTower(team: Team, ping: Ping, radius: number,
 declare function GetNumOfAliveHeroes(isEnemy: boolean): number;
 
 declare function IsValid(target: Unit): boolean;
+declare function IsDisabled(unit: Unit): boolean;
+declare function GetModifierTime(unit: Unit, modifierName: string): number;
 
 declare function GetHeroesNearLocation(enemy: boolean, location: Vector, radius: number): Unit[];
 
@@ -107,6 +110,7 @@ declare function IsDefending(bot: Unit): boolean;
 declare function GetHumanPing(): LuaMultiReturn<[any, any]>;
 declare function GetEnemiesAroundLoc(location: Vector, radius: number): number;
 declare function DoesTeamHaveAegis(): boolean;
+declare function IsRoshanAlive(): boolean;
 declare function GetAverageLevel(bEnemy: boolean): number;
 declare function GetInventoryNetworth(): LuaMultiReturn<[any, any]>;
 declare function IsValidBuilding(unit: any): boolean;

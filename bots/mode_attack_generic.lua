@@ -13,7 +13,27 @@ if Utils.BuggyHeroesDueToValveTooLazy[botName] then
 	local_mode_attack_generic = dofile( GetScriptDirectory().."/FunLib/override_generic/mode_attack_generic" )
 end
 
-if local_mode_attack_generic ~= nil then
+-- Behaviour flag `fight` (behavior/fight, spec section 6): one team-wide fight state, focus target and
+-- initiator for every hero; Valve's attack mode and the override above are not used then.
+local Fight = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('fight') and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
+local tBehaviorErrors = {}
+local function SafeCall(sName, fn, ...)
+	local ok, res = pcall(fn, ...)
+	if ok then return res end
+	local sMsg = tostring(res)
+	if not tBehaviorErrors[sMsg] then
+		tBehaviorErrors[sMsg] = true
+		print('BEHAVIOR_ERROR '..sName..' team='..GetTeam()..' t='..math.floor(DotaTime())..' '..sMsg)
+	end
+	return nil
+end
+
+if Fight ~= nil then
+	function GetDesire() return SafeCall('fight', Fight.AttackDesire, bot) or 0 end
+	function Think() SafeCall('fight', Fight.AttackThink, bot) end
+	function OnStart() end
+	function OnEnd() end
+elseif local_mode_attack_generic ~= nil then
 	function GetDesire() return local_mode_attack_generic.GetDesire() end
 	function Think() return local_mode_attack_generic.Think() end
 	function OnStart() return local_mode_attack_generic.OnStart() end

@@ -328,6 +328,8 @@ Located in `mode_*_generic.lua` files:
 
 These files generally don't need updating for item/ability patches, only for game mechanic changes (e.g., timing changes, map changes).
 
+**Smarter bot behaviour (feature flags):** the mode files above call the modules in `FunLib/behavior/` when their flag is on in `Customize.Behavior`. See [BEHAVIOR_CHANGES.md](BEHAVIOR_CHANGES.md) for what each flag does and how to run test games, and [specs/smarter-bot-behaviour.md](specs/smarter-bot-behaviour.md) for the design.
+
 ---
 
 ## 9. FretBots (Enhanced Difficulty)
@@ -483,6 +485,19 @@ Some Lua files in `bots/FunLib/` are **generated from TypeScript** via TSTL. Whe
 | `FunLib/behavior/team_brain.lua` | `typescript/bots/FunLib/behavior/team_brain.ts` |
 | `FunLib/behavior/thrash.lua` | `typescript/bots/FunLib/behavior/thrash.ts` |
 | `FunLib/behavior/laning.lua` | `typescript/bots/FunLib/behavior/laning.ts` |
+| `FunLib/behavior/pull.lua` | `typescript/bots/FunLib/behavior/pull.ts` |
+| `FunLib/behavior/rng.lua` | `typescript/bots/FunLib/behavior/rng.ts` |
+| `FunLib/behavior/group.lua` | `typescript/bots/FunLib/behavior/group.ts` |
+| `FunLib/behavior/escape.lua` | `typescript/bots/FunLib/behavior/escape.ts` |
+| `FunLib/behavior/lotus.lua` | `typescript/bots/FunLib/behavior/lotus.ts` |
+| `FunLib/behavior/siege.lua` | `typescript/bots/FunLib/behavior/siege.ts` |
+| `FunLib/behavior/prehorn.lua` | `typescript/bots/FunLib/behavior/prehorn.ts` |
+| `FunLib/behavior/jungle.lua` | `typescript/bots/FunLib/behavior/jungle.ts` |
+| `FunLib/behavior/alone.lua` | `typescript/bots/FunLib/behavior/alone.ts` |
+| `FunLib/behavior/camps.lua` | `typescript/bots/FunLib/behavior/camps.ts` |
+| `FunLib/behavior/gank.lua` | `typescript/bots/FunLib/behavior/gank.ts` |
+| `FunLib/behavior/tpcancel.lua` | `typescript/bots/FunLib/behavior/tpcancel.ts` |
+| `FunLib/behavior/fight.lua` | `typescript/bots/FunLib/behavior/fight.ts` |
 
 Note: `Customize/general.ts` only re-exports `bots/Customize/general.lua`; edit the Lua file directly (it holds `Customize.Behavior`, the per-team behaviour flags).
 

@@ -1184,7 +1184,11 @@ function ConsiderUseTango()
 	and bot:OriginalGetMaxHealth() - bot:OriginalGetHealth() > 250
 	and J.GetHP(bot) < 0.6
 	and not J.IsAttacking(bot)
-	and not bot:WasRecentlyDamagedByAnyHero(2) then
+	and not bot:WasRecentlyDamagedByAnyHero(2)
+	-- Not while running from enemies: tango is an absolute roam desire and took over a retreat (game
+	-- 9090116913 34:41, Lion and Jakiro stopped at a tree with 3 enemies chasing and died).
+	and not (bot:GetActiveMode() == BOT_MODE_RETREAT and bot:GetActiveModeDesire() >= 0.8
+		and #J.GetNearbyHeroes(bot, 1600, true, BOT_MODE_NONE) > 0) then
 		local trees = bot:GetNearbyTrees( 800 )
 		local targetTree = trees[1]
 		local nearEnemyList = J.GetNearbyHeroes(bot, 1000, true, BOT_MODE_NONE )

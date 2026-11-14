@@ -232,9 +232,8 @@ if local_mode_laning_generic or (J.GetPosition(bot) == 1 and J.IsPosxHuman(5)) t
 	end
 end
 
-if bLaning then
-	function Think() Laning.Think(bot) end
-end
+-- Behaviour flag `laning`: no Think here, so Valve's laning Think runs (or the shim's above, for the
+-- heroes Valve's breaks). Trades and stepping out of harass range run as bursts in team roam.
 
 function PickOneAnnouncer()
 	if not hasPickedOneAnnouncer then

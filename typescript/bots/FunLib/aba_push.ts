@@ -3,6 +3,10 @@ import * as jmz from "bots/FunLib/jmz_func";
 import Customize = require("bots/Customize/general");
 import { Barracks, BotMode, BotModeDesire, DamageType, Lane, Team, Tower, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import { IsValidUnit, GetLocationToLocationDistance, RadiantFountainTpPoint, DireFountainTpPoint } from "./utils";
+import { IsOn } from "./behavior/flags";
+import * as Siege from "./behavior/siege";
+import * as Fight from "./behavior/fight";
+import * as Group from "./behavior/group";
 import { getGlobalGameState, getGlobalLocationState, getCachedAlliesNearLoc, getCachedEnemiesNearLoc, autoCleanupCache, getCachedData } from "./global_cache";
 
 Customize.ThinkLess = Customize.Enable ? Customize.ThinkLess : 1;
@@ -14,6 +18,10 @@ Customize.ThinkLess = Customize.Enable ? Customize.ThinkLess : 1;
 const pingTimeDelta = 5;
 const StartToPushTime = 16 * 60; // after X mins, start considering to push.
 const BOT_MODE_DESIRE_EXTRA_LOW = 0.02;
+// Siege commit while this bot is in a hero fight: below attack HIGH (0.75) and fight hold MODERATE (0.5) even with the running-mode bonus.
+const SIEGE_FIGHT_YIELD = 0.3; // tunable
+// Lone pushing with no team push running (behavior/group): at most LOW.
+const NO_PUSH_CAP = 0.25; // tunable
 
 /** Module-scoped state (cache-ish). Keep small and intentional. */
 let hEnemyAncient: Unit | null = null;
@@ -246,7 +254,11 @@ export function GetPushDesire(bot: Unit, lane: Lane): BotModeDesire {
     // }
 
     // 2) compute and publish
-    const res = GetPushDesireHelper(bot, lane);
+    let res = GetPushDesireHelper(bot, lane);
+    // Behaviour flag `group`: with no team push running, nobody pushes past LOW on their own (spec 8.1).
+    if (IsOn("group") && Siege.CommitLane() === null && Group.NoPush() && Group.PushRoleOf(bot, lane) === "none") {
+        res = math.min(res, NO_PUSH_CAP) as BotModeDesire;
+    }
     // jmz.Utils.SetCachedVars(cacheKey, res);
     (bot as any).pushDesire = res;
     return res;
@@ -285,6 +297,28 @@ export function GetPushDesireHelper(bot: Unit, lane: Lane): BotModeDesire {
     // If Ancient under direct pressure → strongly deprioritize pushes
     if (enemiesAtAncient >= 1) return BotModeDesire.ExtraLow;
 
+    // Behaviour flag `group`: high ground is open -> the whole team pushes one lane together
+    // (behavior/siege commit). Before the alone/outnumbered gates below: they would keep the
+    // far-away heroes from walking over to join.
+    if (IsOn("group")) {
+        const commit = Siege.CommitLane();
+        if (commit !== null) {
+            if (commit !== lane) return BotModeDesire.VeryLow;
+            // Behaviour flag `fight`: a hero fight at the siege belongs to the fight module (attack / retreat).
+            // The flat commit desire (+ the running-mode bonus, 0.97) beat both: 9089765175 Axe and Puck stayed
+            // in push mode on Dire's high ground from 85% to 40% health while retreat asked 0.85 (deaths 51:49).
+            if (IsOn("fight") && Fight.FightOf(bot) !== null) return SIEGE_FIGHT_YIELD as BotModeDesire;
+            if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP) return Siege.COMMIT_DESIRE as BotModeDesire;
+        }
+        // Team push below high ground (behavior/group): members push the chosen lane once they met.
+        const role = Group.PushRoleOf(bot, lane);
+        if (role === "skip" || role === "gather") return BotModeDesire.VeryLow;
+        if (role === "push") {
+            if (IsOn("fight") && Fight.FightOf(bot) !== null) return SIEGE_FIGHT_YIELD as BotModeDesire;
+            if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP) return Group.PUSH_DESIRE as BotModeDesire;
+        }
+    }
+
     // --- Push safety gates ---
     // Never push alone when 3+ enemies alive
     if (alliesHere.length <= 1 && gameState.aliveEnemyCount >= 3) {
@@ -301,6 +335,12 @@ export function GetPushDesireHelper(bot: Unit, lane: Lane): BotModeDesire {
         if (alliesHere.length < 3 || gameState.aliveAllyCount < gameState.aliveEnemyCount) {
             nMaxDesire = math.min(nMaxDesire, 0.08);
         }
+    }
+    // Behaviour flag `group`: no high-ground push without the numbers or the Aegis (behavior/siege).
+    // Plain OHA went up to tier 4 with all five enemies alive whenever it led on net worth or levels.
+    if (IsOn("group")) {
+        Siege.Report();
+        if (Siege.PushBlocked(lane)) return BotModeDesire.VeryLow;
     }
     // Reduce desire when low HP
     if (jmz.GetHP(bot) < 0.5) {
@@ -440,7 +480,8 @@ export function GetPushDesireHelper(bot: Unit, lane: Lane): BotModeDesire {
         jmz.CanBeAttacked(hEnemyAncient) &&
         !bot.WasRecentlyDamagedByAnyHero(1) &&
         jmz.GetHP(bot) > 0.5 &&
-        !HasBackdoorProtect(hEnemyAncient)
+        !HasBackdoorProtect(hEnemyAncient) &&
+        !(IsOn("group") && !Siege.HighGroundOpen()[0] && Siege.CommitLane() === null)
     ) {
         bot.SetTarget(hEnemyAncient);
         bot.Action_AttackUnit(hEnemyAncient, true);
@@ -741,6 +782,14 @@ export function PushThink(bot: Unit, lane: Lane): void {
     // Use global cached threat picture
     const alliesHere = getCachedAlliesNearLoc(botLocation, 1600);
     const enemiesHere = getCachedEnemiesNearLoc(botLocation, 1600);
+
+    // Behaviour flag `group`: in a commit window, meet behind the lane front before going up, so
+    // heroes don't walk into high ground one by one (behavior/siege).
+    if (IsOn("group") && Siege.CommitLane() === lane && !Siege.Gathered(lane)) {
+        const gather = Siege.GatherPoint(lane);
+        if (GetUnitToLocationDistance(bot, gather) > 300) bot.Action_MoveToLocation(gather);
+        return;
+    }
 
     // 3) Build a lane-front offset depending on our HP and attack range
     const botAttackRange = botState.attackRange;

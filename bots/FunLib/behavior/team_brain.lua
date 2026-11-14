@@ -33,6 +33,10 @@ function VisibleEnemyHeroes()
         do
             local __continue5
             repeat
+                if unit == nil or unit:IsNull() or not unit:CanBeSeen() then
+                    __continue5 = true
+                    break
+                end
                 if unit:IsIllusion() or jmz.IsSuspiciousIllusion(unit) then
                     __continue5 = true
                     break

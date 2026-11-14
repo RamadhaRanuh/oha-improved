@@ -38,9 +38,9 @@ Add to `bots/Customize/general.lua`:
 -- Behaviour feature flags per team. All false = baseline behaviour (commit cb814c6).
 Customize.Behavior = {
     Radiant = { arbiter = false, laning = false, fight = false, retreat = false,
-                group = false, farm = false, roam = false, humanfeel = false },
+                group = false, farm = false, roam = false, humanfeel = false, escape = false },
     Dire    = { arbiter = false, laning = false, fight = false, retreat = false,
-                group = false, farm = false, roam = false, humanfeel = false },
+                group = false, farm = false, roam = false, humanfeel = false, escape = false },
 }
 ```
 
@@ -158,6 +158,9 @@ If **P0-2 fails** (the teams share state), use the fallback measurement in secti
 If they contradict the stage order in section 14, raise it before stage 1 starts.
 
 ## 5. Stage 1: laning (flag `laning`)
+
+> **Changed after the S1 screen (v2, hybrid).** With our own laning `Think()` (below), the same lineup lost about 20 last hits by 10:00 against Valve's laning (Puck 20 against 38-41 vs Templar Assassin, twice). Now, with the flag on, `mode_laning_generic.lua` defines no `Think()` of its own, so Valve's laning Think (or the shim's, for the heroes Valve's breaks) does the walking, last hitting and denying, as in plain OHA and Beginner AI. Laning desire is a flat `MODERATE` in the laning phase. Trades (step 6) and stepping out of a longer-range harasser's range run as short `HIGH` bursts in team roam (`Laning.BurstDesire` / `Laning.BurstThink`). During a burst `bot.laningHoldUntil` is set; the retreat creep-aggro rule and the farm/retreat anti-chase rules skip only then. Tango, tower aggro and danger are left to OHA's item usage, Valve's laning and retreat. The step list below describes v1 and is kept for the record.
+
 
 Module `behavior/laning.ts`. When the flag is on, `bots/mode_laning_generic.lua` defines `Think()` for **every** hero, delegating to `Laning.Think(bot)`. Neither the shim's `Think()` (lines 175-215) nor the override's runs. When the flag is off, the file is unchanged, including the fall-through defect.
 
@@ -309,11 +312,17 @@ Module `behavior/retreat.ts`, wrapping `mode_retreat_generic.lua`.
 
 **Done when:** the checklist retreat items are scored, and the screen and confirm runs pass.
 
+**Built (2026-11-15, `behavior/escape.ts`, its own flag `escape`)**: the retreat path, after human game 9090116913 (16 of 30 bot deaths after laning came 8+ s after the bot had chosen to retreat, often at 50-90% health). `mode_retreat_generic.lua` had no Think, so the engine walked straight to the fountain. With enemy heroes seen within 2000 in the last 3 s, the bot compares routes home: direct, through one of our towers on the way, a sidestep of 900 or 1600 to either side, or through a healthy ally that is not retreating. Cost is travel time plus 4 x, per threat, the longest time it could be waiting at a point of the next 1500 units before the bot arrives (at most 6 s, halved within 700 of our towers). Re-planned every 0.4 s, keeping the current route unless another is more than 15% + 0.3 cheaper. The TP-home rule stays with the item code; the "1500 per enemy near the path" cost above was replaced by the race estimate.
+
 ## 8. Stage 4: push and defend grouping (flag `group`)
 
 Brain fields `group` and `defenders`. `aba_push.ts` and `aba_defend.ts` read them when the flag is on, and their lane tactics stay as they are.
 
+**Built (2026-11-14, `behavior/group.ts`)** after human game 9089923826 (bots spread out while five humans moved together). It keeps its own state, updated once a second, instead of the brain fields. It covers the push intent (8.1, without the "lane won" start), the defence assignments (8.2), and one addition: **regroup**. After laning, once 3 enemies have been seen together in the last 20 s, bots more than 2500 from the rally point walk to it, and their farm, runes, wards, shops and roaming are capped at `LOW` through the arbiter. The rally point is the push or defence gather point, or else the first healthy core by position. Without a team push, lone pushing is capped at `LOW`. The push stop rule "3 or more unseen" only applies while the lead is under 2.
+
 ### 8.1 Group push intent
+
+**Built early (2026-11-14, `behavior/siege.ts`):** the high-ground gate and Roshan first, after the human saw bots push tier 4 with all five enemies alive. A lane whose enemy tier-1 and tier-2 towers are down is at high ground. Pushing it (and hitting the ancient) is held to `VERY_LOW` unless we have 2+ more heroes alive, the enemy has 2 or fewer, or we hold the Aegis and are not outnumbered. In that held state, after 20:00, with Roshan alive, no Aegis and not outnumbered, `mode_roshan_generic.lua` gives 0.8 so the team takes Roshan first. The rest of this section (intent, members, lane choice) is still to build.
 
 Recompute every 1 s.
 

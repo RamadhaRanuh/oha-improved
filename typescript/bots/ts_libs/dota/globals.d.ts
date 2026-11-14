@@ -3,7 +3,7 @@
  */
 
 import { Unit, Vector, AvoidanceZone } from "./interfaces";
-import { Lane, Team, UnitType } from ".";
+import { Lane, Rune, Team, UnitType } from ".";
 
 declare global {
     function print(...args: any[]): void;
@@ -27,6 +27,8 @@ declare global {
     function GetUnitList(unitType: UnitType): Unit[];
 
     function GameTime(): number;
+    /** Real-world seconds since Dota started; does not pause. */
+    function RealTime(): number;
 
     function IsLocationPassable(loc: Vector): boolean;
 
@@ -61,11 +63,16 @@ declare global {
     function GetHeroKills(playerId: number): number;
     function GetHeroDeaths(playerId: number): number;
     function GetNeutralSpawners(): any;
+    /** Location `amount` (0..1) along the lane; which end is 0 is not documented, so callers check. */
+    function GetLocationAlongLane(lane: Lane, amount: number): Vector;
     function GetLaneFrontLocation(team: Team, lane: Lane, deltaFromFront: number): Vector;
     function GetLaneFrontAmount(team: Team, lane: Lane, ignoreTowers: boolean): number;
     function GetTreeLocation(tree: number): Vector;
     function IsLocationVisible(location: Vector): boolean;
     function RandomVector(length: number): Vector;
+    function GetRuneSpawnLocation(rune: Rune): Vector;
+    /** RUNE_STATUS_UNKNOWN / RUNE_STATUS_AVAILABLE / RUNE_STATUS_MISSING */
+    function GetRuneStatus(rune: Rune): number;
     function Clamp(value: number, min: number, max: number): number;
     function RemapValClamped(value: number, fromMin: number, fromMax: number, toMin: number, toMax: number): number;
     function GetDefendLaneDesire(lane: Lane): number;

@@ -23,7 +23,7 @@ local function __TS__StringIncludes(self, searchString, position)
 end
 -- End of Lua Library inline imports
 local ____exports = {}
-local updateGameStateCache, updateLocationStateCache, updateUnitStateCache, presence_adjust, pingTimeDelta, StartToPushTime, BOT_MODE_DESIRE_EXTRA_LOW, hEnemyAncient, PUSH_CACHE_TTL, gameStateCache, locationStateCache, unitStateCache, BASE_ANC_RADIUS
+local updateGameStateCache, updateLocationStateCache, updateUnitStateCache, presence_adjust, pingTimeDelta, StartToPushTime, BOT_MODE_DESIRE_EXTRA_LOW, SIEGE_FIGHT_YIELD, hEnemyAncient, PUSH_CACHE_TTL, gameStateCache, locationStateCache, unitStateCache, BASE_ANC_RADIUS
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
 local ____dota = require(GetScriptDirectory().."/ts_libs/dota/index")
 local Barracks = ____dota.Barracks
@@ -39,6 +39,11 @@ local IsValidUnit = ____utils.IsValidUnit
 local GetLocationToLocationDistance = ____utils.GetLocationToLocationDistance
 local RadiantFountainTpPoint = ____utils.RadiantFountainTpPoint
 local DireFountainTpPoint = ____utils.DireFountainTpPoint
+local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
+local IsOn = ____flags.IsOn
+local Siege = require(GetScriptDirectory().."/FunLib/behavior/siege")
+local Fight = require(GetScriptDirectory().."/FunLib/behavior/fight")
+local Group = require(GetScriptDirectory().."/FunLib/behavior/group")
 local ____global_cache = require(GetScriptDirectory().."/FunLib/global_cache")
 local getGlobalGameState = ____global_cache.getGlobalGameState
 local getGlobalLocationState = ____global_cache.getGlobalLocationState
@@ -155,6 +160,32 @@ function ____exports.GetPushDesireHelper(bot, lane)
     if enemiesAtAncient >= 1 then
         return BotModeDesire.ExtraLow
     end
+    if IsOn("group") then
+        local commit = Siege.CommitLane()
+        if commit ~= nil then
+            if commit ~= lane then
+                return BotModeDesire.VeryLow
+            end
+            if IsOn("fight") and Fight.FightOf(bot) ~= nil then
+                return SIEGE_FIGHT_YIELD
+            end
+            if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP then
+                return Siege.COMMIT_DESIRE
+            end
+        end
+        local role = Group.PushRoleOf(bot, lane)
+        if role == "skip" or role == "gather" then
+            return BotModeDesire.VeryLow
+        end
+        if role == "push" then
+            if IsOn("fight") and Fight.FightOf(bot) ~= nil then
+                return SIEGE_FIGHT_YIELD
+            end
+            if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP then
+                return Group.PUSH_DESIRE
+            end
+        end
+    end
     if #alliesHere <= 1 and gameState.aliveEnemyCount >= 3 then
         return BotModeDesire.None
     end
@@ -166,6 +197,12 @@ function ____exports.GetPushDesireHelper(bot, lane)
     if GetLocationToLocationDistance(laneFront, enemyFountain) < 5000 then
         if #alliesHere < 3 or gameState.aliveAllyCount < gameState.aliveEnemyCount then
             nMaxDesire = math.min(nMaxDesire, 0.08)
+        end
+    end
+    if IsOn("group") then
+        Siege.Report()
+        if Siege.PushBlocked(lane) then
+            return BotModeDesire.VeryLow
         end
     end
     if jmz.GetHP(bot) < 0.5 then
@@ -271,7 +308,7 @@ function ____exports.GetPushDesireHelper(bot, lane)
             return BOT_MODE_DESIRE_EXTRA_LOW
         end
     end
-    if hEnemyAncient and GetUnitToUnitDistance(bot, hEnemyAncient) < nSearchRange * 0.5 and jmz.CanBeAttacked(hEnemyAncient) and not bot:WasRecentlyDamagedByAnyHero(1) and jmz.GetHP(bot) > 0.5 and not ____exports.HasBackdoorProtect(hEnemyAncient) then
+    if hEnemyAncient and GetUnitToUnitDistance(bot, hEnemyAncient) < nSearchRange * 0.5 and jmz.CanBeAttacked(hEnemyAncient) and not bot:WasRecentlyDamagedByAnyHero(1) and jmz.GetHP(bot) > 0.5 and not ____exports.HasBackdoorProtect(hEnemyAncient) and not (IsOn("group") and not Siege.HighGroundOpen()[1] and Siege.CommitLane() == nil) then
         bot:SetTarget(hEnemyAncient)
         bot:Action_AttackUnit(hEnemyAncient, true)
         return RemapValClamped(
@@ -558,6 +595,8 @@ ____Customize_1.ThinkLess = ____Customize_Enable_0
 pingTimeDelta = 5
 StartToPushTime = 16 * 60
 BOT_MODE_DESIRE_EXTRA_LOW = 0.02
+SIEGE_FIGHT_YIELD = 0.3
+local NO_PUSH_CAP = 0.25
 hEnemyAncient = nil
 PUSH_CACHE_TTL = 0.5
 local BOT_CACHE_TTL = 0.2
@@ -614,6 +653,9 @@ function ____exports.GetPushDesire(bot, lane)
         return BotModeDesire.None
     end
     local res = ____exports.GetPushDesireHelper(bot, lane)
+    if IsOn("group") and Siege.CommitLane() == nil and Group.NoPush() and Group.PushRoleOf(bot, lane) == "none" then
+        res = math.min(res, NO_PUSH_CAP)
+    end
     bot.pushDesire = res
     return res
 end
@@ -732,6 +774,13 @@ function ____exports.PushThink(bot, lane)
     local botLocation = botState.location
     local alliesHere = getCachedAlliesNearLoc(botLocation, 1600)
     local enemiesHere = getCachedEnemiesNearLoc(botLocation, 1600)
+    if IsOn("group") and Siege.CommitLane() == lane and not Siege.Gathered(lane) then
+        local gather = Siege.GatherPoint(lane)
+        if GetUnitToLocationDistance(bot, gather) > 300 then
+            bot:Action_MoveToLocation(gather)
+        end
+        return
+    end
     local botAttackRange = botState.attackRange
     local botHp = botState.hp
     local fDeltaFromFront = math.min(botHp, 0.7) * 800 - 500 + RemapValClamped(
@@ -814,24 +863,24 @@ function ____exports.PushThink(bot, lane)
     local towerDistanceToFountain = bTowerNearby and GetUnitToLocationDistance(nEnemyTowers[1], vTeamFountain) or 0
     for ____, creep in ipairs(nCreeps) do
         do
-            local __continue120
+            local __continue134
             repeat
                 if not jmz.IsValid(creep) or not jmz.CanBeAttacked(creep) then
-                    __continue120 = true
+                    __continue134 = true
                     break
                 end
                 if jmz.IsTormentor(creep) or jmz.IsRoshan(creep) then
-                    __continue120 = true
+                    __continue134 = true
                     break
                 end
                 if bTowerNearby and GetUnitToLocationDistance(creep, vTeamFountain) >= towerDistanceToFountain then
-                    __continue120 = true
+                    __continue134 = true
                     break
                 end
                 bot:Action_AttackUnit(creep, true)
                 return
             until true
-            if not __continue120 then
+            if not __continue134 then
                 break
             end
         end

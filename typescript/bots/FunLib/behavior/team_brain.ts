@@ -122,6 +122,8 @@ export function Get(): TeamView {
 function VisibleEnemyHeroes(): Partial<Record<PlayerID, Unit>> {
     const byId: Partial<Record<PlayerID, Unit>> = {};
     for (const unit of getGlobalUnitState().enemyHeroes) {
+        // The cache is up to 0.5 s old: a hero that left vision since then throws on IsIllusion.
+        if (unit === null || unit.IsNull() || !unit.CanBeSeen()) continue;
         if (unit.IsIllusion() || jmz.IsSuspiciousIllusion(unit)) {
             continue;
         }

@@ -215,6 +215,12 @@ local ____native_2Doperators = require(GetScriptDirectory().."/ts_libs/utils/nat
 local add = ____native_2Doperators.add
 local ____utils = require(GetScriptDirectory().."/FunLib/utils")
 local GetLocationToLocationDistance = ____utils.GetLocationToLocationDistance
+local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
+local IsOn = ____flags.IsOn
+local Alone = require(GetScriptDirectory().."/FunLib/behavior/alone")
+local Group = require(GetScriptDirectory().."/FunLib/behavior/group")
+local ____desire_tiers = require(GetScriptDirectory().."/FunLib/behavior/desire_tiers")
+local DesireTier = ____desire_tiers.DesireTier
 function getDefendState(bot)
     if not bot._defend then
         bot._defend = {
@@ -894,6 +900,9 @@ function ____exports.GetDefendDesireHelper(bot, lane)
     local ds = getDefendState(bot)
     ds.defendLoc = locationState.laneFronts[lane]
     local distanceToDefendLoc = GetUnitToLocationDistance(bot, ds.defendLoc)
+    if IsOn("group") and distanceToDefendLoc > 1200 and Group.DefendRoleOf(bot, lane) == "none" and Alone.DefendAlone(bot, ds.defendLoc) then
+        return BotModeDesire.VeryLow
+    end
     local botLevel = bot:GetLevel()
     if bot:GetAssignedLane() ~= lane and distanceToDefendLoc > 3000 and (jmz.GetPosition(bot) == 1 and botLevel < 6 or jmz.GetPosition(bot) == 2 and botLevel < 6 or jmz.GetPosition(bot) == 3 and botLevel < 5 or jmz.GetPosition(bot) == 4 and botLevel < 4 or jmz.GetPosition(bot) == 5 and botLevel < 4) then
         return BotModeDesire.None
@@ -1220,7 +1229,21 @@ function ____exports.GetDefendDesire(bot, lane)
     ) or bot:IsIllusion() then
         return BotModeDesire.None
     end
+    local role = "none"
+    if IsOn("group") then
+        role = Group.DefendRoleOf(bot, lane)
+        if role == "skip" or role == "gather" then
+            bot.defendDesire = BotModeDesire.VeryLow
+            return BotModeDesire.VeryLow
+        end
+    end
     local res = ____exports.GetDefendDesireHelper(bot, lane)
+    if role == "defend" then
+        res = math.max(res, DesireTier.HIGH)
+    end
+    if role == "defend_forced" then
+        res = math.max(res, DesireTier.FORCED)
+    end
     bot.defendDesire = res
     return res
 end

@@ -10,6 +10,22 @@ local bDebugMode = ( 10 == 10 )
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func' )
 local Utils = require( GetScriptDirectory()..'/FunLib/utils' )
 local Thrash = require( GetScriptDirectory()..'/FunLib/behavior/thrash' )
+-- Cancel a TP into a lost fight (behavior/tpcancel, flag `retreat`).
+local TpCancel = require( GetScriptDirectory()..'/FunLib/behavior/flags' ).IsOn( 'retreat' ) and require( GetScriptDirectory()..'/FunLib/behavior/tpcancel' ) or nil
+-- Behaviour modules run under pcall: a bug in one must not take down the whole mode, and Valve's
+-- console only prints "error in error handling" for errors here, so print the real message (once each).
+local tBehaviorErrors = {}
+local function SafeCall(sName, fn, ...)
+	local ok, res = pcall(fn, ...)
+	if ok then return res end
+	local sMsg = tostring(res)
+	if not tBehaviorErrors[sMsg] then
+		tBehaviorErrors[sMsg] = true
+		print('BEHAVIOR_ERROR '..sName..' team='..GetTeam()..' t='..math.floor(DotaTime())..' '..sMsg)
+	end
+	return nil
+end
+
 local BotBuild = dofile( GetScriptDirectory().."/BotLib/"..string.gsub( botName, "npc_dota_", "" ) )
 local Localization = require( GetScriptDirectory()..'/FunLib/localization' )
 local Customize = require(GetScriptDirectory()..'/Customize/general')
@@ -1007,6 +1023,7 @@ local function ItemUsageComplement()
 				local nItemDesire, hItemTarget, sCastType, sMotive = X.ConsiderItemDesire[sItemName]( hItem )
 
 				if nItemDesire > 0
+				and not ( TpCancel ~= nil and SafeCall('tpcancel', TpCancel.Blocked, bot, sItemName, hItemTarget ) )
 				then
 					if bDebugMode
 						and sMotive ~= nil
@@ -1042,6 +1059,7 @@ function X.SetUseItem( hItem, hItemTarget, sCastType )
 	elseif sCastType == 'ground' or (hItemTarget and type(hItemTarget) ~= 'number' and type(hItemTarget) ~= 'table' and hItemTarget.x ~= nil) -- in case target is a location
 	then
 		bot:Action_UseAbilityOnLocation( hItem, hItemTarget )
+		if TpCancel ~= nil and TpCancel.IsTp( hItem:GetName() ) then SafeCall('tpcancel', TpCancel.Record, bot, hItemTarget ) end
 		return
 	elseif sCastType == 'tree'
 	then
@@ -8387,6 +8405,7 @@ function ItemUsageThink()
 	if DotaTime() > 30 and (DotaTime() - bot.lastItemFrameProcessTime < (bot.frameProcessTime * (1 + Customize.ThinkLess))) then return end
 	bot.lastItemFrameProcessTime = DotaTime()
 	Thrash.Observe(bot) -- debug thrash counter (docs/specs/smarter-bot-behaviour.md 3.2); does nothing unless Utils.DebugMode
+	if TpCancel ~= nil and SafeCall('tpcancel', TpCancel.Check, bot) then return end -- cancel a TP into a lost fight (behavior/tpcancel)
 	if not J.IsNoItemIllution(bot) then ItemUsageComplement() end
 end
 
