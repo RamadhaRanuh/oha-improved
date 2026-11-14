@@ -1208,3 +1208,6 @@ function X.IsThereT3Detroyed()
 	end	
 	return false;
 end
+
+-- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
+GetDesire = require(GetScriptDirectory()..'/FunLib/behavior/arbiter').Wrap(bot, BOT_MODE_FARM, GetDesire)

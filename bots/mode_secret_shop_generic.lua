@@ -175,3 +175,6 @@ function X.IsStronger(bot, enemy)
 	local EPower = enemy:GetEstimatedDamageToTarget(true, bot, 4.0, DAMAGE_TYPE_ALL);
 	return EPower > BPower;
 end
+
+-- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
+GetDesire = require(GetScriptDirectory()..'/FunLib/behavior/arbiter').Wrap(bot, BOT_MODE_SECRET_SHOP, GetDesire)

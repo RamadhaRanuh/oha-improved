@@ -1712,4 +1712,7 @@ end
 X.GetDesire = GetDesire
 X.Think = Think
 
+-- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
+GetDesire = require(GetScriptDirectory()..'/FunLib/behavior/arbiter').Wrap(bot, BOT_MODE_TEAM_ROAM, GetDesire)
+
 return X

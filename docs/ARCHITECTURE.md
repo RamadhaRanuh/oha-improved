@@ -477,6 +477,11 @@ Some Lua files in `bots/FunLib/` are **generated from TypeScript** via TSTL. Whe
 | `FunLib/aba_buff.lua` | `typescript/bots/FunLib/aba_buff.ts` |
 | `Customize/general.lua` | `typescript/bots/Customize/general.ts` |
 | `ts_libs/dota/heroes.lua` | `typescript/bots/ts_libs/dota/heroes.ts` |
+| `FunLib/behavior/flags.lua` | `typescript/bots/FunLib/behavior/flags.ts` |
+| `FunLib/behavior/desire_tiers.lua` | `typescript/bots/FunLib/behavior/desire_tiers.ts` |
+| `FunLib/behavior/arbiter.lua` | `typescript/bots/FunLib/behavior/arbiter.ts` |
+
+Note: `Customize/general.ts` only re-exports `bots/Customize/general.lua`; edit the Lua file directly (it holds `Customize.Behavior`, the per-team behaviour flags).
 
 ### Pure Lua Files (edit directly)
 

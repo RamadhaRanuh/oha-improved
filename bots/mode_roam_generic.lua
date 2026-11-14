@@ -2013,3 +2013,6 @@ ConsiderHeroSpecificRoaming['npc_dota_hero_nevermore'] = function ()
 	end
 	return BOT_MODE_DESIRE_NONE
 end
+
+-- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
+GetDesire = require(GetScriptDirectory()..'/FunLib/behavior/arbiter').Wrap(bot, BOT_MODE_ROAM, GetDesire)

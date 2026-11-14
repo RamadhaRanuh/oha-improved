@@ -9,3 +9,6 @@ function GetDesire()
     return bot.PushLaneDesire[LANE_MID]
 end
 function Think() Push.PushThink(bot, LANE_MID) end
+
+-- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
+GetDesire = require(GetScriptDirectory()..'/FunLib/behavior/arbiter').Wrap(bot, BOT_MODE_PUSH_TOWER_MID, GetDesire)

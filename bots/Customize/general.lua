@@ -126,6 +126,15 @@ Customize.Fretbots = {
 -- This won't be very effective for FPS improvement because Valve has a lot of compute on their side that your PC have to handle for Local Hosting.
 Customize.ThinkLess = 1;
 
+-- Behaviour feature flags per team. All false = baseline behaviour (commit cb814c6).
+-- These are for testing the new behaviour code (docs/specs/smarter-bot-behaviour.md); leave them off for normal play.
+Customize.Behavior = {
+    Radiant = { arbiter = false, laning = false, fight = false, retreat = false,
+                group = false, farm = false, roam = false, humanfeel = false },
+    Dire    = { arbiter = false, laning = false, fight = false, retreat = false,
+                group = false, farm = false, roam = false, humanfeel = false },
+}
+
 return Customize
 
 

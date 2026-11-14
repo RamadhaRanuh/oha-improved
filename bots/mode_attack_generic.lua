@@ -19,3 +19,6 @@ if local_mode_attack_generic ~= nil then
 	function OnStart() return local_mode_attack_generic.OnStart() end
 	function OnEnd() return local_mode_attack_generic.OnEnd() end
 end
+
+-- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
+GetDesire = require(GetScriptDirectory()..'/FunLib/behavior/arbiter').Wrap(bot, BOT_MODE_ATTACK, GetDesire)
