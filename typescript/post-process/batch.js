@@ -101,7 +101,10 @@ function start() {
         `rsync -a ${sq(win + "/cfg/")} ${B}/cfg/`,
         `tr -d '\\r' < ${sq(win + "/games.txt")} > ${B}/games.txt`,
         `setsid nohup bash ${H}/batch.sh ${B} ${parallel} ${timescale} ${sq(win)} > ${B}/batch.out 2>&1 < /dev/null &`,
-        "echo launched",
+        // Wait until the batch has started its first game: a detached process can die with the WSL session
+        // if that session closes too soon (seen when two batches were launched back to back).
+        `for i in $(seq 1 30); do [ -d ${B}/g$(head -1 ${B}/games.txt) ] && break; sleep 1; done`,
+        `[ -d ${B}/g$(head -1 ${B}/games.txt) ] && echo launched || echo "batch did not start"`,
     ].join("\n");
     fs.writeFileSync(path.join(dir, "launch.sh"), launch + "\n");
     const r = spawnSync("wsl.exe", ["-d", distro, "--cd", dir, "--", "bash", "launch.sh"], { encoding: "utf8" });
@@ -142,9 +145,10 @@ function report(name) {
     const dir = path.join(runsDir, name);
     const m = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
     console.log(`Batch ${name}: new team flags ${m.flags}, explore ${m.explore}`);
-    console.log("game  pair  new      winner   result  minutes  kills new-old  nw10 new-old  errors  decisions");
+    console.log("game  pair  new      winner   result  minutes  kills new-old  nw10 new-old  lh10 new-old  errors  decisions");
     let played = 0;
     let won = 0;
+    const sums = { nw: 0, lh: 0 };
     for (const g of Object.keys(m.games).map(Number).sort((a, b) => a - b)) {
         const info = m.games[g];
         const file = path.join(dir, `console.g${g}.log`);
@@ -160,13 +164,18 @@ function report(name) {
         const old = info.newTeam === "radiant" ? "dire" : "radiant";
         const k = rec.kills && rec.kills.end ? `${rec.kills.end[info.newTeam]}-${rec.kills.end[old]}` : "?";
         const nw = rec.nw10 ? `${rec.nw10[info.newTeam]}-${rec.nw10[old]}` : "?";
+        const lhSum = side => (rec.lineup && rec.lh10 ? rec.lineup[side].reduce((a, h) => a + (rec.lh10[h] || 0), 0) : "?");
+        const lh = `${lhSum(info.newTeam)}-${lhSum(old)}`;
         const win = rec.winner === info.newTeam;
         played++;
+        if (rec.nw10) sums.nw += rec.nw10[info.newTeam] - rec.nw10[old];
+        if (rec.lineup && rec.lh10) sums.lh += lhSum(info.newTeam) - lhSum(old);
         if (win) won++;
         console.log(
             `${String(g).padEnd(6)}${String(info.pair).padEnd(6)}${info.newTeam.padEnd(9)}${String(rec.winner).padEnd(9)}${(win ? "WIN" : "loss").padEnd(8)}` +
-                `${String(Math.round(rec.duration / 60)).padEnd(9)}${k.padEnd(16)}${nw.padEnd(15)}${String(errors).padEnd(8)}${decisions}`
+                `${String(Math.round(rec.duration / 60)).padEnd(9)}${k.padEnd(16)}${nw.padEnd(15)}${lh.padEnd(14)}${String(errors).padEnd(8)}${decisions}`
         );
     }
     console.log(`New team won ${won} of ${played} finished games.`);
+    if (played) console.log(`Average per game: nw10 new-old ${Math.round(sums.nw / played)}, lh10 new-old ${Math.round(sums.lh / played)}`);
 }
