@@ -164,14 +164,22 @@ for (let k = 0; k < folds; k++) {
         if (choice === r.act) { agree += r.y; nAgree++; } else { disagree += r.y; nDis++; }
     }
 }
-const se = arr => {
+function se(arr) {
     const m = arr.reduce((a, b) => a + b, 0) / arr.length;
     return Math.sqrt(arr.reduce((a, b) => a + (b - m) * (b - m), 0) / (arr.length - 1) / arr.length);
-};
+}
 const ag = modelRows.filter(r => r.act === r.choice).map(r => r.y);
 const di = modelRows.filter(r => r.act !== r.choice).map(r => r.y);
 console.log(`held-out: always fight ${(fightSum / nFight).toFixed(3)} (n=${nFight}), always run ${(runSum / nRun).toFixed(3)} (n=${nRun})`);
 console.log(`model confident on ${confident}/${total} rows (margin ${opts.margin})`);
+for (const c of ["fight", "run"]) {
+    const ag2 = modelRows.filter(r => r.choice === c && r.act === c).map(r => r.y);
+    const di2 = modelRows.filter(r => r.choice === c && r.act !== c).map(r => r.y);
+    if (ag2.length > 1 && di2.length > 1) {
+        const m = a => a.reduce((x, y) => x + y, 0) / a.length;
+        console.log(`  model says ${c}: forced ${c} ${m(ag2).toFixed(3)} (n=${ag2.length}), forced the other ${m(di2).toFixed(3)} (n=${di2.length}), uplift ${(m(ag2) - m(di2)).toFixed(3)} +- ${(2 * Math.sqrt(se(ag2) ** 2 + se(di2) ** 2)).toFixed(3)}`);
+    }
+}
 if (ag.length > 1 && di.length > 1) {
     const diff = agree / nAgree - disagree / nDis;
     const s = Math.sqrt(se(ag) ** 2 + se(di) ** 2);
