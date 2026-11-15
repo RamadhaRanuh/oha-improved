@@ -28,7 +28,7 @@ const root = path.join(__dirname, "../..");
 const generalPath = path.join(root, "bots/Customize/general.lua");
 const utilsPath = path.join(root, "bots/FunLib/utils.lua");
 const lineupsPath = path.join(root, "docs/specs/measurement-lineups.md");
-const FLAGS = ["arbiter", "laning", "fight", "retreat", "group", "farm", "roam", "humanfeel", "escape"];
+const FLAGS = ["arbiter", "laning", "fight", "retreat", "group", "farm", "roam", "humanfeel", "escape", "learned"];
 const backup = p => p + ".matchbak";
 
 function fail(msg) {

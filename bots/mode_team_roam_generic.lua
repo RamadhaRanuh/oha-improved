@@ -32,7 +32,7 @@ local function FightOwnsHeroes() return Fight ~= nil and Fight.OwnsHeroTargets(b
 local Group = Flags.IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/group') or nil
 -- Exploration in data games (behavior/decision_log): a forced fight runs through team roam.
 local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
-if not DecisionLog.Enabled() then DecisionLog = nil end
+if not DecisionLog.Active() then DecisionLog = nil end
 -- Behaviour modules run under pcall: a bug in one must not take down the whole mode, and Valve's
 -- console only prints "error in error handling" for errors here, so print the real message (once each).
 local tBehaviorErrors = {}

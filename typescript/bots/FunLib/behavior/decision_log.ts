@@ -16,10 +16,19 @@
  * probability `explore` the bot is forced to fight or run (50/50) for FORCE_TIME s. Retreat and team
  * roam read Forced(): "run" lifts retreat to 0.97; "fight" caps retreat at 0.05 and team roam attacks the
  * nearest enemy hero (FightThink). Forced decisions are logged with forced=1.
+ *
+ * Learned policy (flag `learned`, step 3): at each decision with no forced action running, the model in
+ * learned_fight_model.lua (written by typescript/post-process/train-fight.js) predicts the score of fighting
+ * and of running from the same situation fields. If one beats the other by more than the model's margin,
+ * the bot is forced to it for FORCE_TIME s through the same hooks as exploration (the model was trained on
+ * exactly that intervention). Logged as src=learned (forced=0, so it does not mix into training data).
+ * Without a model file, or with a feature list that does not match, the flag does nothing.
  */
 import { BotMode, DamageType, Unit } from "bots/ts_libs/dota";
 import * as jmz from "bots/FunLib/jmz_func";
 import * as Rng from "./rng";
+import * as Flags from "./flags";
+import * as Utils from "bots/FunLib/utils";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import Customize = require("bots/Customize/general");
 
@@ -46,11 +55,71 @@ interface BotState {
     forced: "fight" | "run" | null;
     forcedUntil: number;
     forcedTarget: Unit | null;
+    src: "explore" | "learned" | null;
+}
+
+/** The fields of one FIGHTDEC line. */
+interface Situation {
+    t: number;
+    pos: number;
+    lvl: number;
+    hp: number;
+    mp: number;
+    nw: number;
+    allies: number;
+    allyHp: number;
+    allyLvl: number;
+    allyNw: number;
+    enemies: number;
+    enemyHp: number;
+    enemyLvl: number;
+    missing: number;
+    near: number;
+    nearHp: number;
+    inc: number;
+    out: number;
+    teamOut: number;
+    ult: number;
+    towerAlly: number;
+    towerEnemy: number;
+    home: number;
+    laning: number;
+}
+
+interface Tree {
+    v?: number;
+    f?: number;
+    t?: number;
+    l?: Tree;
+    r?: Tree;
+}
+interface Ensemble {
+    base: number;
+    trees: Tree[];
+}
+interface LearnedModel {
+    features: string[];
+    lr: number;
+    margin: number;
+    fight: Ensemble;
+    run: Ensemble;
 }
 
 const states: Record<number, BotState> = {};
 let enabled: boolean | undefined;
 let explore = 0;
+let learnedOn: boolean | undefined;
+let model: LearnedModel | null | undefined;
+
+function LearnedOn(): boolean {
+    if (learnedOn === undefined) learnedOn = Flags.IsOn("learned");
+    return learnedOn;
+}
+
+/** Decision log on, or the learned policy on for this team: the mode hooks are needed. */
+export function Active(): boolean {
+    return Enabled() || LearnedOn();
+}
 
 export function Enabled(): boolean {
     if (enabled === undefined) {
@@ -65,7 +134,7 @@ function StateOf(bot: Unit): BotState {
     const id = bot.GetPlayerID();
     let s = states[id];
     if (s === undefined) {
-        s = { lastDecision: -999, pending: [], forced: null, forcedUntil: -1, forcedTarget: null };
+        s = { lastDecision: -999, pending: [], forced: null, forcedUntil: -1, forcedTarget: null, src: null };
         states[id] = s;
     }
     return s;
@@ -155,36 +224,23 @@ function MaybeForce(bot: Unit, s: BotState, now: number, enemies: Unit[]): void 
     if (s.forced !== null || explore <= 0 || enemies.length === 0) return;
     if (Rng.Float(0, 1) >= explore) return;
     s.forced = Rng.Float(0, 1) < 0.5 ? "fight" : "run";
+    s.src = "explore";
     s.forcedUntil = now + FORCE_TIME;
+    const nearest = NearestAttackable(bot, enemies);
+    s.forcedTarget = nearest;
+    if (s.forced === "fight" && nearest === null) s.forced = null;
+}
+
+function NearestAttackable(bot: Unit, enemies: Unit[]): Unit | null {
     let nearest: Unit | null = null;
     for (const e of enemies) {
         if (!jmz.CanBeAttacked(e)) continue;
         if (nearest === null || Dist(bot, e) < Dist(bot, nearest)) nearest = e;
     }
-    s.forcedTarget = nearest;
-    if (s.forced === "fight" && nearest === null) s.forced = null;
+    return nearest;
 }
 
-/** Called from retreat's GetDesire for every bot. Returns true (SafeCall reads nil as an error). */
-export function Tick(bot: Unit): boolean {
-    if (!Enabled() || bot.IsIllusion()) return true;
-    const s = StateOf(bot);
-    const now = DotaTime();
-    Settle(bot, s, now);
-    if (!bot.IsAlive()) {
-        s.forced = null;
-        return true;
-    }
-    if (now - s.lastDecision < DECISION_PERIOD) return true;
-    const enemies = RealHeroes(bot, true);
-    if (enemies.length === 0) {
-        if (s.forced !== null && now >= s.forcedUntil) s.forced = null;
-        return true;
-    }
-    s.lastDecision = now;
-    MaybeForce(bot, s, now, enemies);
-
-    const allies = RealHeroes(bot, false);
+function SituationOf(bot: Unit, enemies: Unit[], allies: Unit[], now: number): Situation {
     let nearest = enemies[0];
     let enemyHp = 0;
     let enemyLvl = 0;
@@ -207,14 +263,128 @@ export function Tick(bot: Unit): boolean {
         if (Dist(a, nearest) <= SITUATION_RADIUS) teamOut += a.GetEstimatedDamageToTarget(true, nearest, 3, DamageType.All);
     }
     const nearestHealth = Math.max(nearest.GetHealth(), 1);
+    return {
+        t: now,
+        pos: jmz.GetPosition(bot),
+        lvl: bot.GetLevel(),
+        hp: jmz.GetHP(bot),
+        mp: jmz.GetMP(bot),
+        nw: bot.GetNetWorth(),
+        allies: allies.length,
+        allyHp: allyHp / (allies.length + 1),
+        allyLvl,
+        allyNw,
+        enemies: enemies.length,
+        enemyHp: enemyHp / enemies.length,
+        enemyLvl,
+        missing: MissingEnemies(),
+        near: Math.floor(Dist(bot, nearest)),
+        nearHp: jmz.GetHP(nearest),
+        inc: incoming / Math.max(bot.GetHealth(), 1),
+        out: out / nearestHealth,
+        teamOut: teamOut / nearestHealth,
+        ult: UltReady(bot),
+        towerAlly: NearestTowerDist(bot, false),
+        towerEnemy: NearestTowerDist(bot, true),
+        home: Math.floor(bot.DistanceFromFountain()),
+        laning: jmz.IsInLaningPhase() ? 1 : 0,
+    };
+}
+
+// ---- learned policy ----
+
+/** Same order and transforms as FEATURES in typescript/post-process/train-fight.js. */
+const FEATURE_NAMES = ["hp", "mp", "lvl", "allies", "enemies", "sideDiff", "allyHp", "enemyHp", "lvlDiff", "missing", "near", "nearHp", "inc", "out", "teamOut", "ult", "towerAlly", "towerEnemy", "home", "laning", "minute", "pos"];
+
+function FeaturesOf(x: Situation): number[] {
+    return [
+        x.hp, x.mp, x.lvl, x.allies, x.enemies, x.allies + 1 - x.enemies, x.allyHp, x.enemyHp,
+        x.allyLvl / (x.allies + 1) - x.enemyLvl / Math.max(x.enemies, 1), x.missing, x.near, x.nearHp,
+        Math.min(x.inc, 5), Math.min(x.out, 5), Math.min(x.teamOut, 10), x.ult,
+        Math.min(x.towerAlly, 5000), Math.min(x.towerEnemy, 5000), x.home, x.laning, x.t / 60, x.pos,
+    ];
+}
+
+function Model(): LearnedModel | null {
+    if (model !== undefined) return model;
+    model = null;
+    const [ok, m] = pcall(require, GetScriptDirectory() + "/FunLib/behavior/learned_fight_model");
+    if (!ok || m === undefined || m === null) {
+        print("LEARNED no model file: flag learned does nothing");
+        return model;
+    }
+    const lm = m as LearnedModel;
+    const names = lm.features;
+    let same = names !== undefined && names.length === FEATURE_NAMES.length;
+    if (same) for (let i = 0; i < FEATURE_NAMES.length; i++) if (names[i] !== FEATURE_NAMES[i]) same = false;
+    if (!same) {
+        print("LEARNED model feature list does not match: flag learned does nothing");
+        return model;
+    }
+    model = lm;
+    return model;
+}
+
+function EvalTree(tree: Tree, x: number[]): number {
+    let n = tree;
+    while (n.v === undefined) n = x[(n.f as number) - 1] <= (n.t as number) ? (n.l as Tree) : (n.r as Tree);
+    return n.v;
+}
+
+function Predict(e: Ensemble, lr: number, x: number[]): number {
+    let sum = e.base;
+    for (const t of e.trees) sum += lr * EvalTree(t, x);
+    return sum;
+}
+
+function Learned(bot: Unit, s: BotState, now: number, enemies: Unit[], sit: Situation): void {
+    if (s.forced !== null) return;
+    const m = Model();
+    if (m === null) return;
+    const x = FeaturesOf(sit);
+    const d = Predict(m.fight, m.lr, x) - Predict(m.run, m.lr, x);
+    if (Math.abs(d) <= m.margin) return;
+    const choice = d > 0 ? "fight" : "run";
+    const target = NearestAttackable(bot, enemies);
+    if (choice === "fight" && target === null) return;
+    s.forced = choice;
+    s.src = "learned";
+    s.forcedUntil = now + FORCE_TIME;
+    s.forcedTarget = target;
+    if (Utils.DebugMode) print(`LEARNED team=${GetTeam()} hero=${Short(bot)} t=${F(now, 1)} choice=${choice} d=${F(d)}`);
+}
+
+/** Called from retreat's GetDesire for every bot. Returns true (SafeCall reads nil as an error). */
+export function Tick(bot: Unit): boolean {
+    if (!Active() || bot.IsIllusion()) return true;
+    const s = StateOf(bot);
+    const now = DotaTime();
+    if (Enabled()) Settle(bot, s, now);
+    if (!bot.IsAlive()) {
+        s.forced = null;
+        return true;
+    }
+    if (now - s.lastDecision < DECISION_PERIOD) return true;
+    const enemies = RealHeroes(bot, true);
+    if (enemies.length === 0) {
+        if (s.forced !== null && now >= s.forcedUntil) s.forced = null;
+        return true;
+    }
+    s.lastDecision = now;
+    MaybeForce(bot, s, now, enemies);
+    const allies = RealHeroes(bot, false);
+    const x = SituationOf(bot, enemies, allies, now);
+    if (LearnedOn()) Learned(bot, s, now, enemies, x);
+    if (!Enabled()) return true;
+
     const id = `${GetTeam()}-${bot.GetPlayerID()}-${Math.floor(now * 10)}`;
     print(
-        `FIGHTDEC id=${id} t=${F(now, 1)} team=${GetTeam()} hero=${Short(bot)} pos=${jmz.GetPosition(bot)} lvl=${bot.GetLevel()} hp=${F(jmz.GetHP(bot))} mp=${F(jmz.GetMP(bot))} nw=${bot.GetNetWorth()}` +
-            ` allies=${allies.length} allyHp=${F(allyHp / (allies.length + 1))} allyLvl=${allyLvl} allyNw=${allyNw}` +
-            ` enemies=${enemies.length} enemyHp=${F(enemyHp / enemies.length)} enemyLvl=${enemyLvl} missing=${MissingEnemies()}` +
-            ` near=${Math.floor(Dist(bot, nearest))} nearHp=${F(jmz.GetHP(nearest))} inc=${F(incoming / Math.max(bot.GetHealth(), 1))} out=${F(out / nearestHealth)} teamOut=${F(teamOut / nearestHealth)}` +
-            ` ult=${UltReady(bot)} towerAlly=${NearestTowerDist(bot, false)} towerEnemy=${NearestTowerDist(bot, true)} home=${Math.floor(bot.DistanceFromFountain())} laning=${jmz.IsInLaningPhase() ? 1 : 0}` +
-            ` act=${Action(bot, s)} forced=${s.forced !== null ? 1 : 0}`
+        `FIGHTDEC id=${id} t=${F(now, 1)} team=${GetTeam()} hero=${Short(bot)} pos=${x.pos} lvl=${x.lvl} hp=${F(x.hp)} mp=${F(x.mp)} nw=${x.nw}` +
+            ` allies=${x.allies} allyHp=${F(x.allyHp)} allyLvl=${x.allyLvl} allyNw=${x.allyNw}` +
+            ` enemies=${x.enemies} enemyHp=${F(x.enemyHp)} enemyLvl=${x.enemyLvl} missing=${x.missing}` +
+            ` near=${x.near} nearHp=${F(x.nearHp)} inc=${F(x.inc)} out=${F(x.out)} teamOut=${F(x.teamOut)}` +
+            ` ult=${x.ult} towerAlly=${x.towerAlly} towerEnemy=${x.towerEnemy} home=${x.home} laning=${x.laning}` +
+            ` act=${Action(bot, s)} forced=${s.forced !== null && s.src === "explore" ? 1 : 0} src=${s.forced !== null && s.src !== null ? s.src : "-"}`
     );
     s.pending.push({
         id,
@@ -224,14 +394,14 @@ export function Tick(bot: Unit): boolean {
         enemyDied: {},
         allyDied: {},
         selfDied: false,
-        nw: bot.GetNetWorth(),
+        nw: x.nw,
     });
     return true;
 }
 
 /** The forced action running for this bot, if any (exploration). */
 export function Forced(bot: Unit): string | null {
-    if (!Enabled() || explore <= 0) return null;
+    if (!Active()) return null;
     const s = StateOf(bot);
     if (s.forced === null) return null;
     if (DotaTime() >= s.forcedUntil || !bot.IsAlive()) {

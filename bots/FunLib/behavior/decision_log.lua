@@ -50,20 +50,14 @@ local function __TS__ArrayMap(self, callbackfn, thisArg)
 end
 -- End of Lua Library inline imports
 local ____exports = {}
+local Dist, NearestAttackable, Customize, enabled, explore
 local ____dota = require(GetScriptDirectory().."/ts_libs/dota/index")
 local BotMode = ____dota.BotMode
 local DamageType = ____dota.DamageType
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
 local Rng = require(GetScriptDirectory().."/FunLib/behavior/rng")
-local Customize = require(GetScriptDirectory().."/Customize/general")
-local DECISION_PERIOD = 1
-local SITUATION_RADIUS = 1600
-local HORIZON = 10
-local FORCE_TIME = 4
-local UNSEEN_AGE = 3
-local states = {}
-local enabled
-local explore = 0
+local Flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
+local Utils = require(GetScriptDirectory().."/FunLib/utils")
 function ____exports.Enabled()
     if enabled == nil then
         local cfg = Customize.DecisionLog
@@ -75,6 +69,51 @@ function ____exports.Enabled()
     end
     return enabled
 end
+function Dist(a, b)
+    return GetUnitToUnitDistance(a, b)
+end
+function NearestAttackable(bot, enemies)
+    local nearest = nil
+    for ____, e in ipairs(enemies) do
+        do
+            local __continue52
+            repeat
+                if not jmz.CanBeAttacked(e) then
+                    __continue52 = true
+                    break
+                end
+                if nearest == nil or Dist(bot, e) < Dist(bot, nearest) then
+                    nearest = e
+                end
+                __continue52 = true
+            until true
+            if not __continue52 then
+                break
+            end
+        end
+    end
+    return nearest
+end
+Customize = require(GetScriptDirectory().."/Customize/general")
+local DECISION_PERIOD = 1
+local SITUATION_RADIUS = 1600
+local HORIZON = 10
+local FORCE_TIME = 4
+local UNSEEN_AGE = 3
+local states = {}
+explore = 0
+local learnedOn
+local model
+local function LearnedOn()
+    if learnedOn == nil then
+        learnedOn = Flags.IsOn("learned")
+    end
+    return learnedOn
+end
+--- Decision log on, or the learned policy on for this team: the mode hooks are needed.
+function ____exports.Active()
+    return ____exports.Enabled() or LearnedOn()
+end
 local function StateOf(bot)
     local id = bot:GetPlayerID()
     local s = states[id]
@@ -84,14 +123,12 @@ local function StateOf(bot)
             pending = {},
             forced = nil,
             forcedUntil = -1,
-            forcedTarget = nil
+            forcedTarget = nil,
+            src = nil
         }
         states[id] = s
     end
     return s
-end
-local function Dist(a, b)
-    return GetUnitToUnitDistance(a, b)
 end
 local function Short(u)
     return __TS__StringReplace(
@@ -117,19 +154,19 @@ local function UltReady(bot)
         local i = 0
         while i <= 5 do
             do
-                local __continue12
+                local __continue15
                 repeat
                     local a = bot:GetAbilityInSlot(i)
                     if a == nil or a == nil or a:IsNull() then
-                        __continue12 = true
+                        __continue15 = true
                         break
                     end
                     if a:IsUltimate() and a:IsTrained() and a:IsFullyCastable() then
                         return 1
                     end
-                    __continue12 = true
+                    __continue15 = true
                 until true
-                if not __continue12 then
+                if not __continue15 then
                     break
                 end
             end
@@ -154,10 +191,10 @@ local function MissingEnemies()
     local n = 0
     for ____, pid in ipairs(GetTeamPlayers(GetOpposingTeam())) do
         do
-            local __continue20
+            local __continue23
             repeat
                 if not IsHeroAlive(pid) then
-                    __continue20 = true
+                    __continue23 = true
                     break
                 end
                 local info = GetHeroLastSeenInfo(pid)
@@ -165,9 +202,9 @@ local function MissingEnemies()
                 if age > UNSEEN_AGE then
                     n = n + 1
                 end
-                __continue20 = true
+                __continue23 = true
             until true
-            if not __continue20 then
+            if not __continue23 then
                 break
             end
         end
@@ -198,7 +235,7 @@ local function Settle(bot, s, now)
     local keep = {}
     for ____, p in ipairs(s.pending) do
         do
-            local __continue31
+            local __continue34
             repeat
                 if not bot:IsAlive() then
                     p.selfDied = true
@@ -215,7 +252,7 @@ local function Settle(bot, s, now)
                 end
                 if now - p.at < HORIZON then
                     keep[#keep + 1] = p
-                    __continue31 = true
+                    __continue34 = true
                     break
                 end
                 local kills = #__TS__ArrayFilter(
@@ -227,9 +264,9 @@ local function Settle(bot, s, now)
                     function(____, pid) return p.allyDied[pid] end
                 )
                 print((((((((((("FIGHTOUT id=" .. p.id) .. " died=") .. tostring(p.selfDied and 1 or 0)) .. " kills=") .. tostring(kills)) .. " allyDeaths=") .. tostring(allyDeaths)) .. " hp=") .. F(bot:IsAlive() and jmz.GetHP(bot) or 0)) .. " nwGain=") .. tostring(bot:GetNetWorth() - p.nw))
-                __continue31 = true
+                __continue34 = true
             until true
-            if not __continue31 then
+            if not __continue34 then
                 break
             end
         end
@@ -248,56 +285,15 @@ local function MaybeForce(bot, s, now, enemies)
         return
     end
     s.forced = Rng.Float(0, 1) < 0.5 and "fight" or "run"
+    s.src = "explore"
     s.forcedUntil = now + FORCE_TIME
-    local nearest = nil
-    for ____, e in ipairs(enemies) do
-        do
-            local __continue47
-            repeat
-                if not jmz.CanBeAttacked(e) then
-                    __continue47 = true
-                    break
-                end
-                if nearest == nil or Dist(bot, e) < Dist(bot, nearest) then
-                    nearest = e
-                end
-                __continue47 = true
-            until true
-            if not __continue47 then
-                break
-            end
-        end
-    end
+    local nearest = NearestAttackable(bot, enemies)
     s.forcedTarget = nearest
     if s.forced == "fight" and nearest == nil then
         s.forced = nil
     end
 end
---- Called from retreat's GetDesire for every bot. Returns true (SafeCall reads nil as an error).
-function ____exports.Tick(bot)
-    if not ____exports.Enabled() or bot:IsIllusion() then
-        return true
-    end
-    local s = StateOf(bot)
-    local now = DotaTime()
-    Settle(bot, s, now)
-    if not bot:IsAlive() then
-        s.forced = nil
-        return true
-    end
-    if now - s.lastDecision < DECISION_PERIOD then
-        return true
-    end
-    local enemies = RealHeroes(bot, true)
-    if #enemies == 0 then
-        if s.forced ~= nil and now >= s.forcedUntil then
-            s.forced = nil
-        end
-        return true
-    end
-    s.lastDecision = now
-    MaybeForce(bot, s, now, enemies)
-    local allies = RealHeroes(bot, false)
+local function SituationOf(bot, enemies, allies, now)
     local nearest = enemies[1]
     local enemyHp = 0
     local enemyLvl = 0
@@ -327,11 +323,203 @@ function ____exports.Tick(bot)
         nearest:GetHealth(),
         1
     )
+    return {
+        t = now,
+        pos = jmz.GetPosition(bot),
+        lvl = bot:GetLevel(),
+        hp = jmz.GetHP(bot),
+        mp = jmz.GetMP(bot),
+        nw = bot:GetNetWorth(),
+        allies = #allies,
+        allyHp = allyHp / (#allies + 1),
+        allyLvl = allyLvl,
+        allyNw = allyNw,
+        enemies = #enemies,
+        enemyHp = enemyHp / #enemies,
+        enemyLvl = enemyLvl,
+        missing = MissingEnemies(),
+        near = math.floor(Dist(bot, nearest)),
+        nearHp = jmz.GetHP(nearest),
+        inc = incoming / math.max(
+            bot:GetHealth(),
+            1
+        ),
+        out = out / nearestHealth,
+        teamOut = teamOut / nearestHealth,
+        ult = UltReady(bot),
+        towerAlly = NearestTowerDist(bot, false),
+        towerEnemy = NearestTowerDist(bot, true),
+        home = math.floor(bot:DistanceFromFountain()),
+        laning = jmz.IsInLaningPhase() and 1 or 0
+    }
+end
+--- Same order and transforms as FEATURES in typescript/post-process/train-fight.js.
+local FEATURE_NAMES = {
+    "hp",
+    "mp",
+    "lvl",
+    "allies",
+    "enemies",
+    "sideDiff",
+    "allyHp",
+    "enemyHp",
+    "lvlDiff",
+    "missing",
+    "near",
+    "nearHp",
+    "inc",
+    "out",
+    "teamOut",
+    "ult",
+    "towerAlly",
+    "towerEnemy",
+    "home",
+    "laning",
+    "minute",
+    "pos"
+}
+local function FeaturesOf(x)
+    return {
+        x.hp,
+        x.mp,
+        x.lvl,
+        x.allies,
+        x.enemies,
+        x.allies + 1 - x.enemies,
+        x.allyHp,
+        x.enemyHp,
+        x.allyLvl / (x.allies + 1) - x.enemyLvl / math.max(x.enemies, 1),
+        x.missing,
+        x.near,
+        x.nearHp,
+        math.min(x.inc, 5),
+        math.min(x.out, 5),
+        math.min(x.teamOut, 10),
+        x.ult,
+        math.min(x.towerAlly, 5000),
+        math.min(x.towerEnemy, 5000),
+        x.home,
+        x.laning,
+        x.t / 60,
+        x.pos
+    }
+end
+local function Model()
+    if model ~= nil then
+        return model
+    end
+    model = nil
+    local ok, m = pcall(
+        require,
+        GetScriptDirectory() .. "/FunLib/behavior/learned_fight_model"
+    )
+    if not ok or m == nil or m == nil then
+        print("LEARNED no model file: flag learned does nothing")
+        return model
+    end
+    local lm = m
+    local names = lm.features
+    local same = names ~= nil and #names == #FEATURE_NAMES
+    if same then
+        do
+            local i = 0
+            while i < #FEATURE_NAMES do
+                if names[i + 1] ~= FEATURE_NAMES[i + 1] then
+                    same = false
+                end
+                i = i + 1
+            end
+        end
+    end
+    if not same then
+        print("LEARNED model feature list does not match: flag learned does nothing")
+        return model
+    end
+    model = lm
+    return model
+end
+local function EvalTree(tree, x)
+    local n = tree
+    while n.v == nil do
+        n = x[n.f] <= n.t and n.l or n.r
+    end
+    return n.v
+end
+local function Predict(e, lr, x)
+    local sum = e.base
+    for ____, t in ipairs(e.trees) do
+        sum = sum + lr * EvalTree(t, x)
+    end
+    return sum
+end
+local function Learned(bot, s, now, enemies, sit)
+    if s.forced ~= nil then
+        return
+    end
+    local m = Model()
+    if m == nil then
+        return
+    end
+    local x = FeaturesOf(sit)
+    local d = Predict(m.fight, m.lr, x) - Predict(m.run, m.lr, x)
+    if math.abs(d) <= m.margin then
+        return
+    end
+    local choice = d > 0 and "fight" or "run"
+    local target = NearestAttackable(bot, enemies)
+    if choice == "fight" and target == nil then
+        return
+    end
+    s.forced = choice
+    s.src = "learned"
+    s.forcedUntil = now + FORCE_TIME
+    s.forcedTarget = target
+    if Utils.DebugMode then
+        print((((((((("LEARNED team=" .. tostring(GetTeam())) .. " hero=") .. Short(bot)) .. " t=") .. F(now, 1)) .. " choice=") .. choice) .. " d=") .. F(d))
+    end
+end
+--- Called from retreat's GetDesire for every bot. Returns true (SafeCall reads nil as an error).
+function ____exports.Tick(bot)
+    if not ____exports.Active() or bot:IsIllusion() then
+        return true
+    end
+    local s = StateOf(bot)
+    local now = DotaTime()
+    if ____exports.Enabled() then
+        Settle(bot, s, now)
+    end
+    if not bot:IsAlive() then
+        s.forced = nil
+        return true
+    end
+    if now - s.lastDecision < DECISION_PERIOD then
+        return true
+    end
+    local enemies = RealHeroes(bot, true)
+    if #enemies == 0 then
+        if s.forced ~= nil and now >= s.forcedUntil then
+            s.forced = nil
+        end
+        return true
+    end
+    s.lastDecision = now
+    MaybeForce(bot, s, now, enemies)
+    local allies = RealHeroes(bot, false)
+    local x = SituationOf(bot, enemies, allies, now)
+    if LearnedOn() then
+        Learned(
+            bot,
+            s,
+            now,
+            enemies,
+            x
+        )
+    end
+    if not ____exports.Enabled() then
+        return true
+    end
     local id = (((tostring(GetTeam()) .. "-") .. tostring(bot:GetPlayerID())) .. "-") .. tostring(math.floor(now * 10))
-    print(((((((((((((((((((((("FIGHTDEC id=" .. id) .. " t=") .. F(now, 1)) .. " team=") .. tostring(GetTeam())) .. " hero=") .. Short(bot)) .. " pos=") .. tostring(jmz.GetPosition(bot))) .. " lvl=") .. tostring(bot:GetLevel())) .. " hp=") .. F(jmz.GetHP(bot))) .. " mp=") .. F(jmz.GetMP(bot))) .. " nw=") .. tostring(bot:GetNetWorth())) .. ((((((" allies=" .. tostring(#allies)) .. " allyHp=") .. F(allyHp / (#allies + 1))) .. " allyLvl=") .. tostring(allyLvl)) .. " allyNw=") .. tostring(allyNw)) .. ((((((" enemies=" .. tostring(#enemies)) .. " enemyHp=") .. F(enemyHp / #enemies)) .. " enemyLvl=") .. tostring(enemyLvl)) .. " missing=") .. tostring(MissingEnemies())) .. ((((((((" near=" .. tostring(math.floor(Dist(bot, nearest)))) .. " nearHp=") .. F(jmz.GetHP(nearest))) .. " inc=") .. F(incoming / math.max(
-        bot:GetHealth(),
-        1
-    ))) .. " out=") .. F(out / nearestHealth)) .. " teamOut=") .. F(teamOut / nearestHealth)) .. ((((((((" ult=" .. tostring(UltReady(bot))) .. " towerAlly=") .. tostring(NearestTowerDist(bot, false))) .. " towerEnemy=") .. tostring(NearestTowerDist(bot, true))) .. " home=") .. tostring(math.floor(bot:DistanceFromFountain()))) .. " laning=") .. tostring(jmz.IsInLaningPhase() and 1 or 0)) .. ((" act=" .. Action(bot, s)) .. " forced=") .. tostring(s.forced ~= nil and 1 or 0))
+    print(((((((((((((((((((((("FIGHTDEC id=" .. id) .. " t=") .. F(now, 1)) .. " team=") .. tostring(GetTeam())) .. " hero=") .. Short(bot)) .. " pos=") .. tostring(x.pos)) .. " lvl=") .. tostring(x.lvl)) .. " hp=") .. F(x.hp)) .. " mp=") .. F(x.mp)) .. " nw=") .. tostring(x.nw)) .. ((((((" allies=" .. tostring(x.allies)) .. " allyHp=") .. F(x.allyHp)) .. " allyLvl=") .. tostring(x.allyLvl)) .. " allyNw=") .. tostring(x.allyNw)) .. ((((((" enemies=" .. tostring(x.enemies)) .. " enemyHp=") .. F(x.enemyHp)) .. " enemyLvl=") .. tostring(x.enemyLvl)) .. " missing=") .. tostring(x.missing)) .. ((((((((" near=" .. tostring(x.near)) .. " nearHp=") .. F(x.nearHp)) .. " inc=") .. F(x.inc)) .. " out=") .. F(x.out)) .. " teamOut=") .. F(x.teamOut)) .. ((((((((" ult=" .. tostring(x.ult)) .. " towerAlly=") .. tostring(x.towerAlly)) .. " towerEnemy=") .. tostring(x.towerEnemy)) .. " home=") .. tostring(x.home)) .. " laning=") .. tostring(x.laning)) .. ((((" act=" .. Action(bot, s)) .. " forced=") .. tostring(s.forced ~= nil and s.src == "explore" and 1 or 0)) .. " src=") .. (s.forced ~= nil and s.src ~= nil and s.src or "-"))
     local ____s_pending_0 = s.pending
     ____s_pending_0[#____s_pending_0 + 1] = {
         id = id,
@@ -347,13 +535,13 @@ function ____exports.Tick(bot)
         enemyDied = {},
         allyDied = {},
         selfDied = false,
-        nw = bot:GetNetWorth()
+        nw = x.nw
     }
     return true
 end
 --- The forced action running for this bot, if any (exploration).
 function ____exports.Forced(bot)
-    if not ____exports.Enabled() or explore <= 0 then
+    if not ____exports.Active() then
         return nil
     end
     local s = StateOf(bot)

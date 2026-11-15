@@ -8,7 +8,7 @@ local bFightFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn(
 local Fight = bFightFlag and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
 -- Fight decision log for the learned policy (behavior/decision_log; Customize.DecisionLog), all bots.
 local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
-if not DecisionLog.Enabled() then DecisionLog = nil end
+if not DecisionLog.Active() then DecisionLog = nil end
 local tBehaviorErrors = {}
 local function SafeCall(sName, fn, ...)
 	local ok, res = pcall(fn, ...)

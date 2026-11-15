@@ -23,6 +23,7 @@
         "match": "node ./typescript/post-process/match-setup.js",
         "decisions": "node ./typescript/post-process/decisions-dataset.js",
         "batch": "node ./typescript/post-process/batch.js",
+        "train-fight": "node ./typescript/post-process/train-fight.js",
         "update-version":"node ./typescript/post-process/update-version.js",
         "update-ne": "npm run build:node && node ./dist/post-process/static-neutrals-matchup.js",
         "neutrals": "npm run build:node && node ./dist/post-process/neutrals.js",
