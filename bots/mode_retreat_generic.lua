@@ -6,6 +6,9 @@ local bRetreatFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsO
 local bFightFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('fight')
 -- Team fight state (behavior/fight): engaged bots only run when about to die; disengage sends all of them.
 local Fight = bFightFlag and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
+-- Fight decision log for the learned policy (behavior/decision_log; Customize.DecisionLog), all bots.
+local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
+if not DecisionLog.Enabled() then DecisionLog = nil end
 local tBehaviorErrors = {}
 local function SafeCall(sName, fn, ...)
 	local ok, res = pcall(fn, ...)
@@ -23,6 +26,8 @@ local bot = GetBot()
 
 local botHP, botMP, botName, botHealth, botHealthRegen, botManaRegen, botLocation, botTarget
 local botLevel, botActiveMode
+local fStuckLogAt = -99
+local bFountainGuard = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('arbiter') or require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('escape')
 local nAllyHeroes, nEnemyHeroes
 
 local fRetreatFromTormentorTime = 0
@@ -192,6 +197,24 @@ function GetDesire()
             if nAdjusted > res then sWhy = 'fight_'..((nAdjusted >= Fight.SURVIVE) and 'survive' or 'disengage') else sWhy = 'fight_engaged' end
             res = nAdjusted
         end
+    end
+    if DecisionLog ~= nil then
+        SafeCall('decision_log', DecisionLog.Tick, bot)
+        local sForced = DecisionLog.Forced(bot)
+        if sForced == 'run' then res = math.max(res, 0.97); sWhy = 'explore_run'
+        elseif sForced == 'fight' then res = math.min(res, 0.05); sWhy = 'explore_fight' end
+    end
+    -- Guard: healed up at the fountain with no enemy near, retreat has nothing left to do. Game 9091079067:
+    -- all five Dire bots stood in their fountain in retreat ('formula') for 3-4 game minutes with full health.
+    -- RETREATSTUCK prints what retreat asked for there (Utils.DebugMode), to find the cause.
+    -- Only for teams with a behaviour flag that can hold retreat (arbiter, escape): plain OHA stays as it was.
+    if bFountainGuard and bot:IsAlive() and bot:GetActiveMode() == BOT_MODE_RETREAT and bot:DistanceFromFountain() < 1500
+    and J.GetHP(bot) > 0.9 and J.GetMP(bot) > 0.8 and #J.GetEnemiesNearLoc(bot:GetLocation(), 1600) == 0 then
+        if J.Utils.DebugMode and DotaTime() - fStuckLogAt >= 5 then
+            fStuckLogAt = DotaTime()
+            print('RETREATSTUCK team='..GetTeam()..' hero='..bot:GetUnitName()..' t='..math.floor(DotaTime())..' raw='..string.format('%.3f', res)..' why='..sWhy..' active='..string.format('%.3f', bot:GetActiveModeDesire()))
+        end
+        res = 0; sWhy = 'healed_at_fountain'
     end
     CountWhy()
     TrackDeath(res)
@@ -547,6 +570,8 @@ function X.FightExitDesire(nEnemyCount, nAllyCount, bWeAreStronger)
         if nIncoming >= bot:GetHealth() then return 0.9, 'fight_lane_burst' end
     end
 
+    -- Caught by an enemy at least as fast as us (behavior/fight): running only gives it free hits; fight back.
+    if Fight ~= nil and SafeCall('fight', Fight.IsCaught, bot) then return 0, nil end
     if nEnemyCount > nAllyCount and not bWeAreStronger and botHP < 0.85
     -- RETREAT too: once out of hero damage for 2 s the rule would drop and hand the bot straight back to the fight.
     and (botActiveMode == BOT_MODE_ATTACK or botActiveMode == BOT_MODE_TEAM_ROAM or botActiveMode == BOT_MODE_RETREAT

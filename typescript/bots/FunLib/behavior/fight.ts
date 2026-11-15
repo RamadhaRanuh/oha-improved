@@ -35,7 +35,7 @@
  *   FIGHT team=2 t=1704 eng=7 none>engage ratio=1.41 allies=axe,jugg,cm enemies=luna,lion focus=lion init=axe
  *   FIGHT team=2 t=1709 eng=7 focus=luna (was lion) score=3.2
  */
-import { DamageType, Unit, UnitType, Vector } from "bots/ts_libs/dota";
+import { BotMode, DamageType, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import * as jmz from "bots/FunLib/jmz_func";
 import * as Utils from "bots/FunLib/utils";
 import * as Brain from "./team_brain";
@@ -54,7 +54,9 @@ const MISSING_TRAVEL = 5;
 const MISSING_WEIGHT = 0.75;
 // ---- states (tunable)
 const ENGAGE_RATIO = 1.25;
-const ENGAGE_RATIO_LANING = 2.0; // laning: harass and trades belong to behavior/laning; only clear kills here
+// Laning: harass and trades belong to behavior/laning; only clear kills here. 2.0 in bot game 9090959010:
+// engages dropped back to none within 1.5 s (ratio 1.3-1.8) and nobody committed; Radiant had 1 kill by 10:00.
+const ENGAGE_RATIO_LANING = 1.6;
 const DISENGAGE_RATIO = 0.8;
 const HUMAN_FACTOR = 0.75; // ratio multiplier when a person is among the enemies (tunable)
 // Engage only if no more unaccounted enemies than our heroes here, unless a target is low (after laning).
@@ -99,6 +101,14 @@ const ENGAGE_RETREAT_CAP = 0.3;
 const ENGAGE_DESIRE = 0.83;
 const DISENGAGE_RETREAT = 0.88;
 const DISENGAGE_MIN = 2;
+// Caught: an enemy hero this close that is at least as fast as us. Running then only gives it free hits, so
+// the bot fights back instead of disengaging (until Survive). Bot game 9090987563: most of the new team's 68
+// deaths started at full health and ran under fight_disengage / fight_outnumbered with 2-4 enemies on them
+// (kills 13-67).
+const CAUGHT_RANGE = 450;
+const CAUGHT_MIN_HP = 0.45;
+const CAUGHT_SPEED_MARGIN = 15;
+const CAUGHT_LOG_GAP = 10;
 
 const SKIP_MODS = [
     "modifier_dazzle_shallow_grave",
@@ -345,9 +355,21 @@ function LowTarget(f: Fight): boolean {
     return false;
 }
 
-/** After laning: more enemies unaccounted for than we have allies here, and no low target: likely a trap. */
+/**
+ * After laning: more enemies unaccounted for than we have allies here, no low target and no clear edge
+ * (ratio below OUTNUMBERED_RATIO): likely a trap. Bot game 9090959010: without the ratio condition, the
+ * enemies out of sight blocked almost every engage after laning (Radiant 3 kills, Dire 51).
+ */
+const trapLogged: Record<number, boolean> = {};
 function Trap(f: Fight, laning: boolean): boolean {
-    return !laning && Unaccounted(f) > f.allies.length && !LowTarget(f);
+    if (laning || f.ratio >= OUTNUMBERED_RATIO || LowTarget(f)) return false;
+    const missing = Unaccounted(f);
+    if (missing <= f.allies.length) return false;
+    if (!trapLogged[f.id]) {
+        trapLogged[f.id] = true;
+        Log(f, `trap ratio=${Math.floor(f.ratio * 100) / 100} unaccounted=${missing} allies=${f.allies.length}`);
+    }
+    return true;
 }
 
 function UpdateState(f: Fight): void {
@@ -568,6 +590,7 @@ export function AttackDesire(bot: Unit): number {
     const f = FightOf(bot);
     if (f === null) return 0;
     const hp = jmz.GetHP(bot);
+    if (f.state !== "engage" && Catcher(bot) !== null && !Survive(bot)) return DesireTier.HIGH;
     if (f.state === "engage") {
         if (FocusUnit(f) === null && DotaTime() - f.focusSeenAt > FOG_TIME) return 0;
         // About to die: let retreat have it. With the running-mode bonus, FORCED attack (0.9 + 0.12) beat
@@ -640,6 +663,15 @@ export function AttackThink(bot: Unit): void {
     if (jmz.CanNotUseAction(bot)) return;
     const f = FightOf(bot);
     if (f === null) return;
+    if (f.state !== "engage") {
+        // Caught outside an engage: hit the enemy that caught us.
+        const c = Catcher(bot);
+        if (c !== null) {
+            bot.SetTarget(c);
+            if (bot.GetAttackTarget() !== c) bot.Action_AttackUnit(c, true);
+            return;
+        }
+    }
     if (FollowerHold(bot, f)) return;
     let t = FocusUnit(f);
     if (t === null) {
@@ -679,6 +711,29 @@ export function AttackThink(bot: Unit): void {
 
 // ---------------------------------------------------------------------------------------------
 // Retreat
+
+const caughtLogAt: Record<number, number> = {};
+/** The enemy hero that caught this bot (see CAUGHT_RANGE), or null. */
+export function Catcher(bot: Unit): Unit | null {
+    if (!bot.IsAlive() || jmz.GetHP(bot) < CAUGHT_MIN_HP) return null;
+    const speed = bot.GetCurrentMovementSpeed();
+    for (const e of bot.GetNearbyHeroes(CAUGHT_RANGE, true, BotMode.None)) {
+        if (!jmz.IsValidHero(e) || jmz.IsSuspiciousIllusion(e) || !jmz.CanBeAttacked(e)) continue;
+        if (e.GetCurrentMovementSpeed() < speed - CAUGHT_SPEED_MARGIN) continue;
+        const id = bot.GetPlayerID();
+        if (Utils.DebugMode && DotaTime() - (caughtLogAt[id] ?? -999) >= CAUGHT_LOG_GAP) {
+            caughtLogAt[id] = DotaTime();
+            print(`FIGHT team=${GetTeam()} t=${Math.floor(DotaTime())} caught hero=${Short(bot.GetUnitName())} by=${Short(e.GetUnitName())} hp=${jmz.GetHP(bot).toFixed(2)}`);
+        }
+        return e;
+    }
+    return null;
+}
+
+/** Caught and not about to die: fight back rather than run (retreat's fight_outnumbered reads this). */
+export function IsCaught(bot: Unit): boolean {
+    return Catcher(bot) !== null && !Survive(bot);
+}
 
 /** About to die: health below SURVIVE_HP with an enemy hero close, or projected health below SURVIVE_PROJECTED. */
 /** Our focus is in attack reach and dies to two of our hits. */
@@ -724,13 +779,21 @@ export function RetreatAdjust(bot: Unit, desire: number, why: string): number {
         return Math.min(desire, ENGAGE_RETREAT_CAP);
     }
     if (f.state === "disengage") {
+        if (IsCaught(bot)) return desire;
         const near = jmz.GetEnemiesNearLoc(bot.GetLocation(), CLEAR_RADIUS).length > 0;
         if (near || DotaTime() - f.disengageAt < DISENGAGE_MIN) return Math.max(desire, DISENGAGE_RETREAT);
     }
     return desire;
 }
 
-/** Team roam steps aside: hero targets belong to the fight module (spec 6.4). */
-export function OwnsHeroTargets(): boolean {
-    return !jmz.IsInLaningPhase();
+/**
+ * Team roam steps aside while this bot's engagement has a decision (engage, hold or disengage): hero
+ * targets belong to the fight module then (spec 6.4). With no engagement or state none, plain OHA's
+ * "help the targeted core" and "help an ally" run. Bot game 9090959010: switching them off for the whole
+ * game after laning left lone bots without help (Radiant 3 kills, Dire 51).
+ */
+export function OwnsHeroTargets(bot: Unit): boolean {
+    if (jmz.IsInLaningPhase()) return false;
+    const f = FightOf(bot);
+    return f !== null && f.state !== "none";
 }

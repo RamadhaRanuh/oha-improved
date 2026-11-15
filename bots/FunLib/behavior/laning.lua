@@ -68,6 +68,7 @@ local ____desire_tiers = require(GetScriptDirectory().."/FunLib/behavior/desire_
 local DesireTier = ____desire_tiers.DesireTier
 local Pull = require(GetScriptDirectory().."/FunLib/behavior/pull")
 local Jungle = require(GetScriptDirectory().."/FunLib/behavior/jungle")
+local Flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
 function StateOf(bot)
     local key = (tostring(bot:GetPlayerID()) .. ":") .. bot:GetUnitName()
     local state = states[key]
@@ -713,7 +714,7 @@ function ____exports.BurstDesire(bot)
         end
         return Tier(bot, "burst." .. state.burst, state.burst == "disengage" and state.burstDesire or DesireTier.HIGH)
     end
-    if bot:GetActiveMode() == BotMode.Attack and jmz.IsCore(bot) then
+    if bot:GetActiveMode() == BotMode.Attack and jmz.IsCore(bot) and not Flags.IsOn("fight") then
         local attackDesire = bot:GetActiveModeDesire()
         local fightTarget = FightTarget(bot)
         local ____temp_0

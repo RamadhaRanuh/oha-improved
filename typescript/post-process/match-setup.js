@@ -4,6 +4,10 @@
 //   npm run match -- play <flag>[,<flag>...]     human-vs-bot feel game: flags on BOTH teams, heroes untouched
 //   npm run match -- play none                   same, every flag off (baseline OHA with debug prints)
 //   npm run match -- reset                       put general.lua and utils.lua back as they were
+//   ... --explore=0.03                           data game: bots sometimes force a random fight / run
+//
+// Every setup also turns on the fight decision log (Customize.DecisionLog; FIGHTDEC / FIGHTOUT lines,
+// docs/specs/learned-fight-decisions.md), with explore 0 unless --explore is given.
 //
 // <game> is 1..32: game n plays lineup pair ceil(n/4) in rotation ((n-1) % 4) + 1, so a
 // screen is games 1-8 (pairs 1 and 2) and a confirm run is games 1-32.
@@ -30,7 +34,22 @@ function fail(msg) {
     process.exit(1);
 }
 
-const args = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+let explore = 0;
+const args = rawArgs.filter(a => {
+    const m = a.match(/^--explore=([0-9.]+)$/);
+    if (m) explore = Number(m[1]);
+    return !m;
+});
+if (!(explore >= 0 && explore <= 1)) fail("--explore must be between 0 and 1");
+// Customize.DecisionLog: logging on for every match setup.
+const withDecisionLog = text => {
+    const re = /Customize\.DecisionLog = \{[^}]*\}/;
+    const line = `Customize.DecisionLog = { enabled = true, explore = ${explore} }`;
+    if (re.test(text)) return text.replace(re, line);
+    const nl = text.includes("\r\n") ? "\r\n" : "\n";
+    return text.replace(/\r?\nreturn Customize/, nl + line + nl + "return Customize");
+};
 if (args[0] === "reset") {
     for (const p of [generalPath, utilsPath]) {
         if (fs.existsSync(backup(p))) {
@@ -66,7 +85,7 @@ if (args[0] === "play") {
     const re = /Customize\.Behavior = \{[\s\S]*?\n\}/;
     if (!re.test(text)) fail("Could not find Customize.Behavior in general.lua");
     text = text.replace(re, `Customize.Behavior = {${nl}    Radiant = { ${row} },${nl}    Dire    = { ${row} },${nl}}`);
-    fs.writeFileSync(generalPath, text);
+    fs.writeFileSync(generalPath, withDecisionLog(text));
     setDebugMode();
     console.log(`Play setup: flags on both teams (${on.length ? on.join(", ") : "none: baseline OHA"}); heroes as in general.lua. Debug prints on.`);
     console.log("When done: npm run match -- reset");
@@ -117,7 +136,7 @@ general = replaceTable(
     "Behavior",
     `Customize.Behavior = {${nl}    Radiant = { ${flagRow(newTeam === "Radiant")} },${nl}    Dire    = { ${flagRow(newTeam === "Dire")} },${nl}}`
 );
-fs.writeFileSync(generalPath, general);
+fs.writeFileSync(generalPath, withDecisionLog(general));
 
 // utils.lua: DebugMode on, for the thrash counter
 const utils = fs.readFileSync(utilsPath, "utf8");
@@ -127,4 +146,4 @@ fs.writeFileSync(utilsPath, utils.replace(/____exports\.DebugMode = (true|false)
 console.log(`Game ${game}: pair ${pair}, rotation ${rotation}`);
 console.log(`  Radiant: lineup ${radiantSide}  ${lineup[radiantSide].join(", ")}${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
 console.log(`  Dire:    lineup ${direSide}  ${lineup[direSide].join(", ")}${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
-console.log("  Debug prints on (thrash counter). Check the picks match at the start of the game.");
+console.log(`  Debug prints on (thrash counter). Decision log on, explore ${explore}. Check the picks match at the start of the game.`);

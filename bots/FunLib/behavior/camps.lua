@@ -242,6 +242,9 @@ local function Plan(bot, s, now, sec, minute)
     if now < STACK_START or sec < PLAN_FROM or sec > 50 then
         return false
     end
+    if not jmz.IsInLaningPhase() then
+        return false
+    end
     local gap = jmz.IsInLaningPhase() and STACK_GAP_LANING or STACK_GAP
     if now - s.lastStack < gap then
         return false
@@ -264,19 +267,19 @@ local function Plan(bot, s, now, sec, minute)
         local i = 0
         while i < #list do
             do
-                local __continue46
+                local __continue47
                 repeat
                     local c = list[i + 1]
                     if c.team ~= GetTeam() or HIT_SEC[c.type] == nil then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     if c.type == "ancient" and bot:GetLevel() < 6 then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     if claimed[i] == minute then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     local d = Dist(
@@ -284,26 +287,26 @@ local function Plan(bot, s, now, sec, minute)
                         c.centre
                     )
                     if d >= bestDist then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     if d * PATH_FACTOR / speed > HIT_SEC[c.type] - 2 - sec then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     if EnemyNear(c.centre, ENEMY_RADIUS) then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     if KnownEmptyOrTaken(bot, c.centre) then
-                        __continue46 = true
+                        __continue47 = true
                         break
                     end
                     best = i
                     bestDist = d
-                    __continue46 = true
+                    __continue47 = true
                 until true
-                if not __continue46 then
+                if not __continue47 then
                     break
                 end
             end

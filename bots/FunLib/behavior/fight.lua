@@ -107,6 +107,20 @@ local function __TS__ArraySlice(self, first, last)
     return out
 end
 
+local function __TS__NumberToFixed(self, fractionDigits)
+    if math.abs(self) >= 1e+21 or self ~= self then
+        return tostring(self)
+    end
+    local f = math.floor(fractionDigits or 0)
+    if f < 0 or f > 99 then
+        error("toFixed() digits argument must be between 0 and 99", 0)
+    end
+    return string.format(
+        ("%." .. tostring(f)) .. "f",
+        self
+    )
+end
+
 local function __TS__StringStartsWith(self, searchString, position)
     if position == nil or position < 0 then
         position = 0
@@ -115,8 +129,9 @@ local function __TS__StringStartsWith(self, searchString, position)
 end
 -- End of Lua Library inline imports
 local ____exports = {}
-local FoggedHealth, Dist, Short, Log, Live, Allies, Centre, EnemyName, InitiatorWeight, EnemyEntries, Groups, Ratio, Fighting, Contact, SetState, Unaccounted, LowTarget, Trap, UpdateState, FocusScore, UpdateFocus, Build, FocusUnit, FinishingKill, Survive, BUCKET, SEEN_RECENT, GROUP_LINK, CONTACT, JOIN_TIME, MISSING_AGE, MISSING_TRAVEL, MISSING_WEIGHT, ENGAGE_RATIO, ENGAGE_RATIO_LANING, DISENGAGE_RATIO, HUMAN_FACTOR, ELSEWHERE_AGE, ELSEWHERE_DIST, LOW_TARGET_HP, OUTNUMBERED_RATIO, HOLD_AFTER, MIN_ENGAGE, DEATH_WINDOW, CLEAR_RADIUS, FIGHTING_RADIUS, FOCUS_NEAR, FOCUS_FAR, SWITCH_FACTOR, LOST_TIME, FOCUS_LEASH_DIST, LEASH_TIME, LEASH_DROP, LEASH_SKIP, SURVIVE_HP, SURVIVE_LOW_HP, SURVIVE_RADIUS, SURVIVE_PROJECTED, PROJECT_RADIUS, PROJECT_TIME, SKIP_MODS, BLADE_MAIL, fights, builtAt, nextId, skipUntil, lastHealth, lastMaxHealth, FOGGED_MIN_HP, humanIds
+local FoggedHealth, Dist, Short, Log, Live, Allies, Centre, EnemyName, InitiatorWeight, EnemyEntries, Groups, Ratio, Fighting, Contact, SetState, Unaccounted, LowTarget, Trap, UpdateState, FocusScore, UpdateFocus, Build, FocusUnit, FinishingKill, Survive, BUCKET, SEEN_RECENT, GROUP_LINK, CONTACT, JOIN_TIME, MISSING_AGE, MISSING_TRAVEL, MISSING_WEIGHT, ENGAGE_RATIO, ENGAGE_RATIO_LANING, DISENGAGE_RATIO, HUMAN_FACTOR, ELSEWHERE_AGE, ELSEWHERE_DIST, LOW_TARGET_HP, OUTNUMBERED_RATIO, HOLD_AFTER, MIN_ENGAGE, DEATH_WINDOW, CLEAR_RADIUS, FIGHTING_RADIUS, FOCUS_NEAR, FOCUS_FAR, SWITCH_FACTOR, LOST_TIME, FOCUS_LEASH_DIST, LEASH_TIME, LEASH_DROP, LEASH_SKIP, SURVIVE_HP, SURVIVE_LOW_HP, SURVIVE_RADIUS, SURVIVE_PROJECTED, PROJECT_RADIUS, PROJECT_TIME, CAUGHT_RANGE, CAUGHT_MIN_HP, CAUGHT_SPEED_MARGIN, CAUGHT_LOG_GAP, SKIP_MODS, BLADE_MAIL, fights, builtAt, nextId, skipUntil, lastHealth, lastMaxHealth, FOGGED_MIN_HP, humanIds, trapLogged, caughtLogAt
 local ____dota = require(GetScriptDirectory().."/ts_libs/dota/index")
+local BotMode = ____dota.BotMode
 local DamageType = ____dota.DamageType
 local UnitType = ____dota.UnitType
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
@@ -414,7 +429,21 @@ function LowTarget(f)
     return false
 end
 function Trap(f, laning)
-    return not laning and Unaccounted(f) > #f.allies and not LowTarget(f)
+    if laning or f.ratio >= OUTNUMBERED_RATIO or LowTarget(f) then
+        return false
+    end
+    local missing = Unaccounted(f)
+    if missing <= #f.allies then
+        return false
+    end
+    if not trapLogged[f.id] then
+        trapLogged[f.id] = true
+        Log(
+            f,
+            (((("trap ratio=" .. tostring(math.floor(f.ratio * 100) / 100)) .. " unaccounted=") .. tostring(missing)) .. " allies=") .. tostring(#f.allies)
+        )
+    end
+    return true
 end
 function UpdateState(f)
     local now = DotaTime()
@@ -619,7 +648,7 @@ function Build()
     local taken = {}
     for ____, group in ipairs(Groups(entries)) do
         do
-            local __continue131
+            local __continue134
             repeat
                 local centre = Centre(__TS__ArrayMap(
                     group,
@@ -636,7 +665,7 @@ function Build()
                     ) end
                 )
                 if not inContact then
-                    __continue131 = true
+                    __continue134 = true
                     break
                 end
                 local members = __TS__ArrayFilter(
@@ -664,7 +693,7 @@ function Build()
                     end
                 )
                 if #members == 0 then
-                    __continue131 = true
+                    __continue134 = true
                     break
                 end
                 for ____, a in ipairs(members) do
@@ -673,21 +702,21 @@ function Build()
                 local enemies = __TS__ArraySlice(group)
                 for ____, e in ipairs(Brain.Get().enemies) do
                     do
-                        local __continue143
+                        local __continue146
                         repeat
                             if not e.alive or e.visible or e.lastSeenLoc == nil or e.lastSeenAge <= SEEN_RECENT or e.lastSeenAge > MISSING_AGE then
-                                __continue143 = true
+                                __continue146 = true
                                 break
                             end
                             if __TS__ArraySome(
                                 enemies,
                                 function(____, x) return x.id == e.id end
                             ) then
-                                __continue143 = true
+                                __continue146 = true
                                 break
                             end
                             if Dist(e.lastSeenLoc, centre) / 300 > MISSING_TRAVEL then
-                                __continue143 = true
+                                __continue146 = true
                                 break
                             end
                             enemies[#enemies + 1] = {
@@ -698,9 +727,9 @@ function Build()
                                 health = FoggedHealth(e.id),
                                 power = e.rawPower
                             }
-                            __continue143 = true
+                            __continue146 = true
                         until true
-                        if not __continue143 then
+                        if not __continue146 then
                             break
                         end
                     end
@@ -764,9 +793,9 @@ function Build()
                 UpdateFocus(f)
                 UpdateState(f)
                 next[#next + 1] = f
-                __continue131 = true
+                __continue134 = true
             until true
-            if not __continue131 then
+            if not __continue134 then
                 break
             end
         end
@@ -790,6 +819,41 @@ function FocusUnit(f)
     for ____, e in ipairs(f.enemies) do
         if e.id == f.focusId and Live(e.unit) and e.unit:IsAlive() then
             return e.unit
+        end
+    end
+    return nil
+end
+--- The enemy hero that caught this bot (see CAUGHT_RANGE), or null.
+function ____exports.Catcher(bot)
+    if not bot:IsAlive() or jmz.GetHP(bot) < CAUGHT_MIN_HP then
+        return nil
+    end
+    local speed = bot:GetCurrentMovementSpeed()
+    for ____, e in ipairs(bot:GetNearbyHeroes(CAUGHT_RANGE, true, BotMode.None)) do
+        do
+            local __continue224
+            repeat
+                if not jmz.IsValidHero(e) or jmz.IsSuspiciousIllusion(e) or not jmz.CanBeAttacked(e) then
+                    __continue224 = true
+                    break
+                end
+                if e:GetCurrentMovementSpeed() < speed - CAUGHT_SPEED_MARGIN then
+                    __continue224 = true
+                    break
+                end
+                local id = bot:GetPlayerID()
+                if Utils.DebugMode and DotaTime() - (caughtLogAt[id] or -999) >= CAUGHT_LOG_GAP then
+                    caughtLogAt[id] = DotaTime()
+                    print((((((((("FIGHT team=" .. tostring(GetTeam())) .. " t=") .. tostring(math.floor(DotaTime()))) .. " caught hero=") .. Short(bot:GetUnitName())) .. " by=") .. Short(e:GetUnitName())) .. " hp=") .. __TS__NumberToFixed(
+                        jmz.GetHP(bot),
+                        2
+                    ))
+                end
+                return e
+            until true
+            if not __continue224 then
+                break
+            end
         end
     end
     return nil
@@ -818,10 +882,10 @@ function Survive(bot)
     local close = false
     for ____, e in ipairs(jmz.GetEnemiesNearLoc(loc, PROJECT_RADIUS)) do
         do
-            local __continue218
+            local __continue233
             repeat
                 if not jmz.IsValidHero(e) then
-                    __continue218 = true
+                    __continue233 = true
                     break
                 end
                 if Dist(
@@ -831,9 +895,9 @@ function Survive(bot)
                     close = true
                 end
                 incoming = incoming + e:GetEstimatedDamageToTarget(true, bot, PROJECT_TIME, DamageType.All)
-                __continue218 = true
+                __continue233 = true
             until true
-            if not __continue218 then
+            if not __continue233 then
                 break
             end
         end
@@ -858,7 +922,7 @@ MISSING_AGE = 8
 MISSING_TRAVEL = 5
 MISSING_WEIGHT = 0.75
 ENGAGE_RATIO = 1.25
-ENGAGE_RATIO_LANING = 2
+ENGAGE_RATIO_LANING = 1.6
 DISENGAGE_RATIO = 0.8
 HUMAN_FACTOR = 0.75
 ELSEWHERE_AGE = 10
@@ -898,6 +962,10 @@ local ENGAGE_RETREAT_CAP = 0.3
 local ENGAGE_DESIRE = 0.83
 local DISENGAGE_RETREAT = 0.88
 local DISENGAGE_MIN = 2
+CAUGHT_RANGE = 450
+CAUGHT_MIN_HP = 0.45
+CAUGHT_SPEED_MARGIN = 15
+CAUGHT_LOG_GAP = 10
 SKIP_MODS = {
     "modifier_dazzle_shallow_grave",
     "modifier_abaddon_borrowed_time",
@@ -917,6 +985,7 @@ lastMaxHealth = {}
 FOGGED_MIN_HP = 0.5
 local lastAttackOrder = {}
 humanIds = {}
+trapLogged = {}
 --- Attack mode desire (spec 6.2).
 function ____exports.AttackDesire(bot)
     if not bot:IsAlive() or bot:IsIllusion() then
@@ -927,6 +996,9 @@ function ____exports.AttackDesire(bot)
         return 0
     end
     local hp = jmz.GetHP(bot)
+    if f.state ~= "engage" and ____exports.Catcher(bot) ~= nil and not Survive(bot) then
+        return DesireTier.HIGH
+    end
     if f.state == "engage" then
         if FocusUnit(f) == nil and DotaTime() - f.focusSeenAt > FOG_TIME then
             return 0
@@ -972,10 +1044,10 @@ local function FollowerHold(bot, f)
     local nearestDist = 99999
     for ____, e in ipairs(f.enemies) do
         do
-            local __continue182
+            local __continue186
             repeat
                 if not Live(e.unit) then
-                    __continue182 = true
+                    __continue186 = true
                     break
                 end
                 if jmz.IsDisabled(e.unit) then
@@ -995,9 +1067,9 @@ local function FollowerHold(bot, f)
                     nearestDist = d
                     nearest = e
                 end
-                __continue182 = true
+                __continue186 = true
             until true
-            if not __continue182 then
+            if not __continue186 then
                 break
             end
         end
@@ -1025,11 +1097,11 @@ local function Kite(bot, f)
     end
     for ____, e in ipairs(f.enemies) do
         do
-            local __continue193
+            local __continue197
             repeat
                 local u = e.unit
                 if not Live(u) or u:GetAttackRange() > MELEE_RANGE then
-                    __continue193 = true
+                    __continue197 = true
                     break
                 end
                 local d = Dist(
@@ -1037,7 +1109,7 @@ local function Kite(bot, f)
                     e.loc
                 )
                 if d > KITE_RANGE then
-                    __continue193 = true
+                    __continue197 = true
                     break
                 end
                 local loc = bot:GetLocation()
@@ -1045,7 +1117,7 @@ local function Kite(bot, f)
                 bot:Action_MoveToLocation(Vector(loc.x + (loc.x - e.loc.x) / len * KITE_STEP, loc.y + (loc.y - e.loc.y) / len * KITE_STEP, loc.z))
                 return true
             until true
-            if not __continue193 then
+            if not __continue197 then
                 break
             end
         end
@@ -1059,6 +1131,16 @@ function ____exports.AttackThink(bot)
     local f = ____exports.FightOf(bot)
     if f == nil then
         return
+    end
+    if f.state ~= "engage" then
+        local c = ____exports.Catcher(bot)
+        if c ~= nil then
+            bot:SetTarget(c)
+            if bot:GetAttackTarget() ~= c then
+                bot:Action_AttackUnit(c, true)
+            end
+            return
+        end
     end
     if FollowerHold(bot, f) then
         return
@@ -1080,11 +1162,11 @@ function ____exports.AttackThink(bot)
     ) > range + SWAP_RANGE then
         for ____, e in ipairs(f.enemies) do
             do
-                local __continue206
+                local __continue213
                 repeat
                     local u = e.unit
                     if not Live(u) or u == t or not jmz.CanBeAttacked(u) then
-                        __continue206 = true
+                        __continue213 = true
                         break
                     end
                     local skip = false
@@ -1100,9 +1182,9 @@ function ____exports.AttackThink(bot)
                         t = u
                         break
                     end
-                    __continue206 = true
+                    __continue213 = true
                 until true
-                if not __continue206 then
+                if not __continue213 then
                     break
                 end
             end
@@ -1122,6 +1204,11 @@ function ____exports.AttackThink(bot)
             GameTime()
         }
     end
+end
+caughtLogAt = {}
+--- Caught and not about to die: fight back rather than run (retreat's fight_outnumbered reads this).
+function ____exports.IsCaught(bot)
+    return ____exports.Catcher(bot) ~= nil and not Survive(bot)
 end
 --- Retreat desire under the team fight (spec 7): while engaged only SURVIVE (other retreat reasons are
 -- capped at ENGAGE_RETREAT_CAP); while disengaging every member runs at DISENGAGE_RETREAT.
@@ -1147,6 +1234,9 @@ function ____exports.RetreatAdjust(bot, desire, why)
         return math.min(desire, ENGAGE_RETREAT_CAP)
     end
     if f.state == "disengage" then
+        if ____exports.IsCaught(bot) then
+            return desire
+        end
         local near = #jmz.GetEnemiesNearLoc(
             bot:GetLocation(),
             CLEAR_RADIUS
@@ -1157,8 +1247,15 @@ function ____exports.RetreatAdjust(bot, desire, why)
     end
     return desire
 end
---- Team roam steps aside: hero targets belong to the fight module (spec 6.4).
-function ____exports.OwnsHeroTargets()
-    return not jmz.IsInLaningPhase()
+--- Team roam steps aside while this bot's engagement has a decision (engage, hold or disengage): hero
+-- targets belong to the fight module then (spec 6.4). With no engagement or state none, plain OHA's
+-- "help the targeted core" and "help an ally" run. Bot game 9090959010: switching them off for the whole
+-- game after laning left lone bots without help (Radiant 3 kills, Dire 51).
+function ____exports.OwnsHeroTargets(bot)
+    if jmz.IsInLaningPhase() then
+        return false
+    end
+    local f = ____exports.FightOf(bot)
+    return f ~= nil and f.state ~= "none"
 end
 return ____exports

@@ -27,9 +27,12 @@ local Camps = Flags.IsOn('farm') and require(GetScriptDirectory()..'/FunLib/beha
 local sHumanMode = nil -- 'tp' | 'gank' | 'stack' | 'group' while one of them owns this mode
 -- Behaviour flag `fight`: after the laning phase hero targets belong to behavior/fight (spec 6.4).
 local Fight = Flags.IsOn('fight') and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
-local function FightOwnsHeroes() return Fight ~= nil and Fight.OwnsHeroTargets() end
+local function FightOwnsHeroes() return Fight ~= nil and Fight.OwnsHeroTargets(bot) end
 -- Behaviour flag `group`: walk to a defence or push meeting point, or back to the regrouping team (behavior/group).
 local Group = Flags.IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/group') or nil
+-- Exploration in data games (behavior/decision_log): a forced fight runs through team roam.
+local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
+if not DecisionLog.Enabled() then DecisionLog = nil end
 -- Behaviour modules run under pcall: a bug in one must not take down the whole mode, and Valve's
 -- console only prints "error in error handling" for errors here, so print the real message (once each).
 local tBehaviorErrors = {}
@@ -121,6 +124,13 @@ function GetDesire()
     if Fight ~= nil and res > FIGHT_YIELD then
         local f = SafeCall('fight', Fight.FightOf, bot)
         if f ~= nil and f.state ~= 'none' then res = FIGHT_YIELD end
+    end
+
+    if DecisionLog ~= nil and DecisionLog.Forced(bot) == 'fight' then
+        sHumanMode = 'explore'
+        res = 0.97
+    elseif sHumanMode == 'explore' then
+        sHumanMode = nil
     end
 
     -- J.Utils.SetCachedVars(cacheKey, res)
@@ -412,6 +422,10 @@ end
 -- Think
 -- ==============================
 function Think()
+	if sHumanMode == 'explore' then
+		SafeCall('decision_log', DecisionLog.FightThink, bot)
+		return
+	end
 	if sHumanMode == 'tp' then
 		SafeCall('tp', Gank.TpThink, bot) -- gives no order while channeling
 		return

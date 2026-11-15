@@ -4,8 +4,7 @@
  * Stacking: a support walks to one of our camps, hits a neutral at the stack second (x:52-x:54 by
  * camp size) and walks away, so the neutrals are out of the spawn box at x:00 and a second set spawns.
  * Our cores then clear a bigger camp. Plain OHA never stacks.
- *   - Positions 4 and 5 only, from STACK_START, at most once per STACK_GAP s each (STACK_GAP_LANING
- *     in the laning phase, when they also have a lane).
+ *   - Positions 4 and 5 only, in the laning phase only, from STACK_START, at most once per STACK_GAP_LANING s each.
  *   - The camp: our own, not claimed by another stacker this minute, no enemy hero near it, and
  *     reachable before the hit second.
  *   - Aborts on enemies near, damage from a hero, or low HP.
@@ -188,6 +187,9 @@ function Plan(bot: Unit, s: StackState, now: number, sec: number, minute: number
     const pos = jmz.GetPosition(bot);
     if (pos !== 4 && pos !== 5) return false;
     if (now < STACK_START || sec < PLAN_FROM || sec > 50) return false;
+    // Laning phase only (user, after bot game 9090959010: supports left to stack every minute until 51:00,
+    // often into danger, and the team fought without them).
+    if (!jmz.IsInLaningPhase()) return false;
     const gap = jmz.IsInLaningPhase() ? STACK_GAP_LANING : STACK_GAP;
     if (now - s.lastStack < gap) return false;
     if (!bot.IsAlive() || Busy(bot) || jmz.GetHP(bot) < MIN_HP) return false;

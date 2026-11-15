@@ -29,6 +29,8 @@ Customize.Behavior = {
 
 A missing table or key counts as off.
 
+**Recommended set (bot-vs-bot results, section 4a):** `arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`. Leave `fight`, `retreat` and `farm` off: they lost games against plain OHA. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+
 | Flag | What it switches on | Main modules |
 |---|---|---|
 | `arbiter` | Desire tiers, a bonus for the running mode (fewer mode flips), mode-change counting | `behavior/arbiter`, `behavior/desire_tiers`, `behavior/thrash` |
@@ -58,6 +60,8 @@ sv_cheats 1; script_reload_code bots/tools/match_recorder
 ```
 
 It records human-played heroes and K/D/A as well.
+
+Every `npm run match` setup also turns on the fight decision log (`FIGHTDEC` / `FIGHTOUT` lines for every bot on both teams). Add `--explore=0.03` for data-collection games. `npm run decisions` builds `datasets/fight_decisions.csv` from the logs. See [specs/learned-fight-decisions.md](specs/learned-fight-decisions.md).
 
 ## 3. The modules
 
@@ -167,6 +171,52 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
 | 9090116913 | Lion and Jakiro stopped to eat a tango while three enemies chased them | No tango while retreating hard with an enemy hero within 1600 (`mode_roam_generic.lua`) |
 | 9090116913 | Defend, push and regroup (0.75 + 0.12 = 0.87) beat "outnumbered, back off" (0.85) | `fight_outnumbered` raised to 0.88 |
 | 9090116913 | 16 of 30 deaths after laning came while already retreating, on the straight walk home | New `escape` flag: retreat route that avoids chasers |
+
+## 4a. Bot-vs-bot results and fixes (2026-11-15)
+
+The new bot against plain OHA, both teams bots (`npm run match`, lineups from `docs/specs/measurement-lineups.md`). Pair 1:
+- lineup A: Juggernaut, Puck, Axe, Earthshaker, Crystal Maiden;
+- lineup B: Luna, Templar Assassin, Centaur, Lion, Witch Doctor.
+
+With plain OHA on both sides, lineup B beat lineup A 51–3 and 67–13 (games 1 and 2, OHA side), and 54–31 earlier (9089218870).
+
+| Match | New bot: side, lineup | Flags on (new bot) | Kills (new – OHA) | Result |
+|---|---|---|---|---|
+| 9090959010 | Radiant, A | all 9 | 3 – 51 | lost |
+| 9090987563 | Dire, A | all 9 | 13 – 67 | lost |
+| 9091005196 | Radiant, B | all 9 | 14 – 47 | lost |
+| 9091028639 | Dire, B | 7 (`fight`, `retreat` off) | 49 – 63 | lost |
+| 9091057862 | Radiant, pair 2 (Io not picked: buggy list) | 5 (also `laning`, `farm` off) | 24 – 47 | lost (no baseline for pair 2) |
+| 9091087510 | Dire, B | 5 | 50 – 22 | won |
+| 9091139294 | Dire, B | 6 (5 + `laning`) | 52 – 27 | won |
+| 9091167580 | Radiant, A | 6 | 60 – 78 | lost, close (76 min, towers 11–11) |
+
+**Conclusions** (one game per step, so directional):
+- `fight` and `retreat` did most of the damage.
+- `farm` cost the rest.
+- `laning` is neutral.
+- With the recommended 6 flags the bot is about even with plain OHA: a close game with the weaker lineup, a smaller margin than OHA's with the stronger one.
+
+**Why `fight` and `retreat` lost.** With `fight` on, Valve's attack mode is replaced, and bots attack heroes only on the module's engage or hold call. Rules tuned on human-vs-bot games made that call rare:
+- engaging needed 2x strength in laning;
+- a "trap" check blocked most engages after laning, because in bot vs bot most enemies are out of sight;
+- OHA's "help an ally" was off after laning;
+- `fight_disengage` and `fight_outnumbered` made caught bots run at full health instead of fighting back.
+
+**Fixes made during the screen.** They're kept, but the flags stay off:
+- **Fight:**
+  - laning engage at 1.6x instead of 2.0x;
+  - the trap check only blocks below a 2x edge, and logs `FIGHT ... trap`;
+  - OHA's help-ally is off only while the bot's engagement has a decision (`OwnsHeroTargets(bot)`);
+  - the lane veto no longer cancels the team's engage;
+  - a "caught" rule (enemy within 450 and at least as fast, health above 45%) makes the bot fight back instead of running, and logs `FIGHT ... caught`.
+- **Farm:** stacking only in the laning phase (supports stacked every minute until 51:00).
+- **Retreat (all flagged teams):**
+  - **The bug:** 9091079067 had all five bots standing in their fountain in retreat mode for 3–4 game minutes at full health. The retreat formula itself was negative there (`RETREATSTUCK` lines), so the cause is elsewhere.
+  - **The guard:** at the fountain with health above 90%, mana above 80% and no enemy within 1600, retreat returns 0.
+  - **Scope:** the guard runs only for teams with `arbiter` or `escape` on, so plain OHA is untouched.
+
+**Speed:** the Windows client never reached the timescale it was given. Games set to `host_timescale` 4 or 8 ran at 2–3x, because the client renders every tick. Headless Linux games in WSL hold the target (see the spec, step 0).
 
 Earlier rounds fixed the following:
 

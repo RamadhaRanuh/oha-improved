@@ -25,6 +25,7 @@ import * as Utils from "bots/FunLib/utils";
 import { DesireTier } from "./desire_tiers";
 import * as Pull from "./pull";
 import * as Jungle from "./jungle";
+import * as Flags from "./flags";
 
 // ---- tunables -------------------------------------------------------------------------
 
@@ -493,7 +494,9 @@ export function BurstDesire(bot: Unit): number {
     // Quick tests 9089559472 / 9089566083: Juggernaut spent 15-34% of lane minutes in attack against
     // Centaur and Lion, then retreated or ran, and had 0-1 last hits in the first 4 minutes. Valve's attack
     // desire can exceed 0.9, so the burst bids just above it.
-    if (bot.GetActiveMode() === BotMode.Attack && jmz.IsCore(bot)) {
+    // Flag `fight`: attack mode runs only on the team's engage call (behavior/fight), so this veto would
+    // cancel it. Bot game 9090959010: Juggernaut disengaged at full health from 2-7x engages on Lion.
+    if (bot.GetActiveMode() === BotMode.Attack && jmz.IsCore(bot) && !Flags.IsOn("fight")) {
         const attackDesire = bot.GetActiveModeDesire();
         const fightTarget = FightTarget(bot);
         const why = fightTarget !== null ? LikelyKill(bot, fightTarget) : "no_target";

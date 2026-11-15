@@ -135,6 +135,11 @@ Customize.Behavior = {
                 group = false, farm = false, roam = false, humanfeel = false },
 }
 
+-- Fight decision log (docs/specs/learned-fight-decisions.md): FIGHTDEC / FIGHTOUT lines for every bot, as
+-- training data for a learned fight / run policy. explore > 0 forces a random fight or run now and then
+-- (data-collection games only). `npm run match` turns logging on; leave it off for normal play.
+Customize.DecisionLog = { enabled = false, explore = 0 }
+
 return Customize
 
 
