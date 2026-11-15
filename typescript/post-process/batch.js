@@ -92,7 +92,7 @@ function start() {
     const repo = toWsl(root);
     const win = toWsl(dir);
     const B = `/opt/oha-runs/${name}`;
-    const H = "/opt/oha-runs/headless";
+    const H = `${B}/scripts`; // per batch: rewriting a script a running batch is reading would break it
     const launch = [
         "set -e",
         `mkdir -p ${B} ${H}`,

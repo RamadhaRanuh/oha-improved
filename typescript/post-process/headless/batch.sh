@@ -23,9 +23,13 @@ for g in $(cat "$B/games.txt"); do
   while [ "$(jobs -rp | wc -l)" -gt "$P" ]; do sleep 5; done   # +1 for the memory sampler
   G=$B/g$g; rm -rf "$G"; mkdir -p "$G"
   cp -r "$B/base" "$G/bots" && cp -r "$B/cfg/g$g/." "$G/bots/"
-  PORT=$((27100 + g))
+  # Claim a free port across every running batch (mkdir is atomic); two servers on one port crash at startup.
+  mkdir -p /tmp/oha-ports
+  PORT=27201
+  until mkdir "/tmp/oha-ports/$PORT" 2>/dev/null; do PORT=$((PORT + 1)); done
   (
     unshare -m bash -c "mount --bind '$G/bots' '$BOTS' && exec bash '$HERE/game.sh' '$G/run' $TS $PORT" > "$G/result.txt" 2>&1
+    rmdir "/tmp/oha-ports/$PORT"
     cp "$G/run/console.log" "$OUT/console.g$g.log" 2>/dev/null
     rm -rf "$G/bots"
     log "g$g done: $(grep -ao '"winner":"[a-z]*"' "$G/run/console.log" | head -1) $(grep -a 'real seconds' "$G/result.txt")"
