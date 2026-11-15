@@ -51,11 +51,18 @@ for (const log of logs) {
     let rec = null;
     const decs = new Map();
     const outs = new Map();
+    const outs30 = new Map();
     for (const line of text.split(/\r?\n/)) {
         let i = line.indexOf("FIGHTDEC ");
         if (i >= 0) {
             const o = kv(line.slice(i + 9));
             decs.set(o.id, o);
+            continue;
+        }
+        i = line.indexOf("FIGHTOUT30 ");
+        if (i >= 0) {
+            const o = kv(line.slice(i + 11));
+            outs30.set(o.id, o);
             continue;
         }
         i = line.indexOf("FIGHTOUT ");
@@ -90,6 +97,11 @@ for (const log of logs) {
             allyDeaths: o.allyDeaths,
             hpEnd: o.hp,
             nwGain: o.nwGain,
+            // 30 s outcome (FIGHTOUT30; empty in logs from before it existed)
+            died30: (outs30.get(id) || {}).died ?? "",
+            kills30: (outs30.get(id) || {}).kills ?? "",
+            allyDeaths30: (outs30.get(id) || {}).allyDeaths ?? "",
+            nwGain30: (outs30.get(id) || {}).nwGain ?? "",
         });
         joined++;
     }

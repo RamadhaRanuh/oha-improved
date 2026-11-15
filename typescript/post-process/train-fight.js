@@ -55,7 +55,11 @@ const FEATURES = [
     ["minute", r => +r.t / 60],
     ["pos", r => +r.pos],
 ];
-const score = r => +r.kills - 1.5 * +r.died - 0.5 * +r.allyDeaths + +r.nwGain / 300;
+// --horizon=30: score from the FIGHTOUT30 columns (deaths, kills and net worth over 30 s instead of 10 s).
+const score = r =>
+    opts.horizon === 30
+        ? +r.kills30 - 1.5 * +r.died30 - 0.5 * +r.allyDeaths30 + +r.nwGain30 / 300
+        : +r.kills - 1.5 * +r.died - 0.5 * +r.allyDeaths + +r.nwGain / 300;
 
 // ---- load ----
 const rows = [];
@@ -68,6 +72,7 @@ for (const f of files) {
         cols.forEach((c, i) => (r[c] = v[i]));
         // --all=1 (testing only): unforced rows too. They carry the bots' own choice bias.
         if ((r.forced !== "1" && !opts.all) || (r.act !== "fight" && r.act !== "run")) continue;
+        if (opts.horizon === 30 && (r.died30 === undefined || r.died30 === "")) continue;
         rows.push({ match: r.match, act: r.act, x: FEATURES.map(([, fn]) => fn(r)), y: score(r) });
     }
 }

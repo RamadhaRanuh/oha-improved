@@ -11,6 +11,8 @@
  *   FIGHTDEC id=2-3-1234 t=123.4 team=2 hero=juggernaut pos=1 lvl=5 hp=0.62 ... act=fight forced=0
  * HORIZON s later, one line with what happened to it and to the heroes around it:
  *   FIGHTOUT id=2-3-1234 died=0 kills=1 allyDeaths=0 hp=0.40 nwGain=310
+ * and HORIZON_LONG s later the same counts over the longer window:
+ *   FIGHTOUT30 id=2-3-1234 died=1 kills=1 allyDeaths=1 hp=0.00 nwGain=180
  *
  * Exploration (data games only, explore > 0): at a decision with no forced action running, with
  * probability `explore` the bot is forced to fight or run (50/50) for FORCE_TIME s. Retreat and team
@@ -35,6 +37,9 @@ import Customize = require("bots/Customize/general");
 const DECISION_PERIOD = 1.0;
 const SITUATION_RADIUS = 1600;
 const HORIZON = 10;
+// Second outcome line: the 10 s score missed what a death costs later (overnight 2026-11-15: a model
+// trained on it lost 6 of 6), so FIGHTOUT30 reports the same counts over 30 s.
+const HORIZON_LONG = 30;
 const FORCE_TIME = 4;
 const UNSEEN_AGE = 3;
 
@@ -47,6 +52,7 @@ interface Pending {
     allyDied: Record<number, boolean>;
     selfDied: boolean;
     nw: number;
+    shortDone: boolean;
 }
 
 interface BotState {
@@ -209,9 +215,18 @@ function Settle(bot: Unit, s: BotState, now: number): void {
         }
         const kills = p.enemyIds.filter(pid => p.enemyDied[pid]).length;
         const allyDeaths = p.allyIds.filter(pid => p.allyDied[pid]).length;
-        print(
-            `FIGHTOUT id=${p.id} died=${p.selfDied ? 1 : 0} kills=${kills} allyDeaths=${allyDeaths} hp=${F(bot.IsAlive() ? jmz.GetHP(bot) : 0)} nwGain=${bot.GetNetWorth() - p.nw}`
-        );
+        const tag = p.shortDone ? "FIGHTOUT30" : "FIGHTOUT";
+        if (!p.shortDone || now - p.at >= HORIZON_LONG) {
+            print(
+                `${tag} id=${p.id} died=${p.selfDied ? 1 : 0} kills=${kills} allyDeaths=${allyDeaths} hp=${F(bot.IsAlive() ? jmz.GetHP(bot) : 0)} nwGain=${bot.GetNetWorth() - p.nw}`
+            );
+        }
+        if (!p.shortDone) {
+            p.shortDone = true;
+            keep.push(p);
+        } else if (now - p.at < HORIZON_LONG) {
+            keep.push(p);
+        }
     }
     s.pending = keep;
 }
@@ -395,6 +410,7 @@ export function Tick(bot: Unit): boolean {
         allyDied: {},
         selfDied: false,
         nw: x.nw,
+        shortDone: false,
     });
     return true;
 }

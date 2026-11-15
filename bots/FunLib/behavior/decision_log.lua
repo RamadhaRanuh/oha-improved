@@ -76,18 +76,18 @@ function NearestAttackable(bot, enemies)
     local nearest = nil
     for ____, e in ipairs(enemies) do
         do
-            local __continue52
+            local __continue55
             repeat
                 if not jmz.CanBeAttacked(e) then
-                    __continue52 = true
+                    __continue55 = true
                     break
                 end
                 if nearest == nil or Dist(bot, e) < Dist(bot, nearest) then
                     nearest = e
                 end
-                __continue52 = true
+                __continue55 = true
             until true
-            if not __continue52 then
+            if not __continue55 then
                 break
             end
         end
@@ -98,6 +98,7 @@ Customize = require(GetScriptDirectory().."/Customize/general")
 local DECISION_PERIOD = 1
 local SITUATION_RADIUS = 1600
 local HORIZON = 10
+local HORIZON_LONG = 30
 local FORCE_TIME = 4
 local UNSEEN_AGE = 3
 local states = {}
@@ -263,7 +264,16 @@ local function Settle(bot, s, now)
                     p.allyIds,
                     function(____, pid) return p.allyDied[pid] end
                 )
-                print((((((((((("FIGHTOUT id=" .. p.id) .. " died=") .. tostring(p.selfDied and 1 or 0)) .. " kills=") .. tostring(kills)) .. " allyDeaths=") .. tostring(allyDeaths)) .. " hp=") .. F(bot:IsAlive() and jmz.GetHP(bot) or 0)) .. " nwGain=") .. tostring(bot:GetNetWorth() - p.nw))
+                local tag = p.shortDone and "FIGHTOUT30" or "FIGHTOUT"
+                if not p.shortDone or now - p.at >= HORIZON_LONG then
+                    print((((((((((((tag .. " id=") .. p.id) .. " died=") .. tostring(p.selfDied and 1 or 0)) .. " kills=") .. tostring(kills)) .. " allyDeaths=") .. tostring(allyDeaths)) .. " hp=") .. F(bot:IsAlive() and jmz.GetHP(bot) or 0)) .. " nwGain=") .. tostring(bot:GetNetWorth() - p.nw))
+                end
+                if not p.shortDone then
+                    p.shortDone = true
+                    keep[#keep + 1] = p
+                elseif now - p.at < HORIZON_LONG then
+                    keep[#keep + 1] = p
+                end
                 __continue34 = true
             until true
             if not __continue34 then
@@ -535,7 +545,8 @@ function ____exports.Tick(bot)
         enemyDied = {},
         allyDied = {},
         selfDied = false,
-        nw = x.nw
+        nw = x.nw,
+        shortDone = false
     }
     return true
 end
