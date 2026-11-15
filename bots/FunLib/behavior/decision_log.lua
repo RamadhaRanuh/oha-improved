@@ -462,8 +462,10 @@ local function Predict(e, lr, x)
     end
     return sum
 end
+--- The learned policy acts only after the lane phase.
+local LEARNED_FROM = 600
 local function Learned(bot, s, now, enemies, sit)
-    if s.forced ~= nil then
+    if s.forced ~= nil or now < LEARNED_FROM then
         return
     end
     local m = Model()
@@ -475,7 +477,10 @@ local function Learned(bot, s, now, enemies, sit)
     if math.abs(d) <= m.margin then
         return
     end
-    local choice = d > 0 and "fight" or "run"
+    if d <= 0 then
+        return
+    end
+    local choice = "fight"
     local target = NearestAttackable(bot, enemies)
     if choice == "fight" and target == nil then
         return

@@ -352,14 +352,20 @@ function Predict(e: Ensemble, lr: number, x: number[]): number {
     return sum;
 }
 
+/** The learned policy acts only after the lane phase. */
+const LEARNED_FROM = 600;
+
 function Learned(bot: Unit, s: BotState, now: number, enemies: Unit[], sit: Situation): void {
-    if (s.forced !== null) return;
+    if (s.forced !== null || now < LEARNED_FROM) return;
     const m = Model();
     if (m === null) return;
     const x = FeaturesOf(sit);
     const d = Predict(m.fight, m.lr, x) - Predict(m.run, m.lr, x);
     if (Math.abs(d) <= m.margin) return;
-    const choice = d > 0 ? "fight" : "run";
+    // Only the model's fight calls: its run calls showed no held-out gain (h30 model), and forcing runs
+    // and lane-phase calls cost farm (learned-h30a: 0 of 3, about 160 forced decisions per game before 10:00).
+    if (d <= 0) return;
+    const choice = "fight";
     const target = NearestAttackable(bot, enemies);
     if (choice === "fight" && target === null) return;
     s.forced = choice;
