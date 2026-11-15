@@ -128,6 +128,7 @@ function GetDesire()
 
     if DecisionLog ~= nil and DecisionLog.Forced(bot) == 'fight' then
         sHumanMode = 'explore'
+        bot.roamSub = 'forcedfight'
         res = 0.97
     elseif sHumanMode == 'explore' then
         sHumanMode = nil
@@ -165,12 +166,15 @@ function GetDesireHelper()
     bLaneBurst = false
     bLotus = false
     sHumanMode = nil
+    -- Debug: which part of team roam bid, read by the DEATH trail in mode_retreat_generic.lua.
+    bot.roamSub = 'other'
 
     -- A TP to a ganked ally: while channeling nothing else may give an order.
     if Gank ~= nil then
         local nTp = SafeCall('tp', Gank.TpDesire, bot) or 0
         if nTp > 0 then
             sHumanMode = 'tp'
+            bot.roamSub = 'tp'
             return nTp
         end
     end
@@ -192,6 +196,7 @@ function GetDesireHelper()
     if ShouldHelpWhenCoreIsTargeted then
         SetStickyTarget(target)
         targetUnit = target
+        bot.roamSub = 'helpcore'
         return RemapValClamped(J.GetHP(bot), 0, 0.5, BOT_MODE_DESIRE_NONE, 0.98)
     end
 
@@ -203,6 +208,7 @@ function GetDesireHelper()
     if ShouldHelpAlly then
         SetStickyTarget(target)
         targetUnit = target
+        bot.roamSub = 'helpally'
         return RemapValClamped(J.GetHP(bot), 0, 0.6, BOT_MODE_DESIRE_NONE, 0.98)
     end
 
@@ -210,6 +216,7 @@ function GetDesireHelper()
 		local nGather = SafeCall('group', Group.GatherDesire, bot) or 0
 		if nGather > 0 then
 			sHumanMode = 'group'
+			bot.roamSub = 'gather'
 			return nGather
 		end
 	end
@@ -217,6 +224,7 @@ function GetDesireHelper()
 		local nGank = SafeCall('gank', Gank.GankDesire, bot) or 0
 		if nGank > 0 then
 			sHumanMode = 'gank'
+			bot.roamSub = 'gank'
 			return nGank
 		end
 	end
@@ -224,6 +232,7 @@ function GetDesireHelper()
 		local nRegroup = SafeCall('group', Group.RegroupDesire, bot) or 0
 		if nRegroup > 0 then
 			sHumanMode = 'group'
+			bot.roamSub = 'regroup'
 			return nRegroup
 		end
 	end
@@ -231,6 +240,7 @@ function GetDesireHelper()
 		local nStack = SafeCall('stack', Camps.StackDesire, bot) or 0
 		if nStack > 0 then
 			sHumanMode = 'stack'
+			bot.roamSub = 'stack'
 			return nStack
 		end
 	end
@@ -240,6 +250,7 @@ function GetDesireHelper()
 		local nLotus = Lotus.Desire(bot)
 		if nLotus > 0 then
 			bLotus = true
+			bot.roamSub = 'lotus'
 			return nLotus
 		end
 	end
@@ -250,10 +261,12 @@ function GetDesireHelper()
 		local nBurst = Laning.BurstDesire(bot)
 		if nBurst > 0 then
 			bLaneBurst = true
+			bot.roamSub = 'burst'
 			return nBurst
 		end
 	end
 	if J.IsValid(hTargetCreep) and J.CanBeAttacked(hTargetCreep) then
+		bot.roamSub = 'lasthit'
 		return 1.5
 	end
 

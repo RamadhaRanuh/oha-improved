@@ -60,7 +60,7 @@ local function CountWhy()
 end
 -- Debug: on death, print the last ~6 s in 0.5 s steps (time before death, health, active mode,
 -- raw retreat desire and its rule, enemy/ally heroes within 1600, distance to the enemy ancient):
---   DEATH team=3 hero=... t=812 -2.5:hp0.41,m4,r0.62,formula,e2,a1,d5400 ...
+--   DEATH team=3 hero=... t=812 -2.5:hp0.41,m4,r0.62,formula,e2,a1,d5400 ...   (,s<sub> in team roam: bot.roamSub)
 local tDeathHist, bWasAlive = {}, true
 local function TrackDeath(res)
     if not J.Utils.DebugMode then return end
@@ -71,7 +71,8 @@ local function TrackDeath(res)
         if last == nil or now - last.t >= 0.5 then
             tDeathHist[#tDeathHist + 1] = { t = now, hp = J.GetHP(bot), mode = bot:GetActiveMode(), want = res or 0, why = sWhy,
                 e = nEnemyHeroes and #nEnemyHeroes or 0, a = nAllyHeroes and #nAllyHeroes or 0,
-                d = GetUnitToUnitDistance(bot, GetAncient(GetOpposingTeam())) }
+                d = GetUnitToUnitDistance(bot, GetAncient(GetOpposingTeam())),
+                sub = bot:GetActiveMode() == BOT_MODE_TEAM_ROAM and bot.roamSub or nil }
             if #tDeathHist > 12 then table.remove(tDeathHist, 1) end
         end
     elseif bWasAlive then
@@ -79,6 +80,7 @@ local function TrackDeath(res)
         local parts = {}
         for _, h in ipairs(tDeathHist) do
             parts[#parts + 1] = string.format('%.1f:hp%.2f,m%d,r%.2f,%s,e%d,a%d,d%d', h.t - now, h.hp, h.mode, h.want, h.why, h.e, h.a, math.floor(h.d))
+                ..(h.sub and (',s'..h.sub) or '')
         end
         print('DEATH team='..GetTeam()..' hero='..bot:GetUnitName()..' t='..math.floor(now)..' '..table.concat(parts, ' '))
         tDeathHist = {}
