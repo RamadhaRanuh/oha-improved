@@ -46,7 +46,7 @@ A learned model chooses fight or run for each bot in a fight. It sits behind a n
 
 ## 4. Steps
 
-### Step 0: headless feasibility check (not started)
+### Step 0: headless feasibility check (done)
 
 Get one headless Dota game running in WSL2 on the Linux build:
 
@@ -59,7 +59,22 @@ Also measure the highest timescale that still holds a steady tick rate.
 - **Time box:** one session.
 - **If it fails:** parallel games are off. Keep the single-client loop and get more data per game (step 1 already logs both teams).
 
-**Needs from the user:** WSL2 installed, CPU core count, RAM, and about 40 GB of free disk space.
+**Needs from the user:** WSL2 installed, CPU core count, RAM, and about 80 GB of free disk space (the Linux install is 77 GB).
+
+**Result (2026-11-15): works.**
+
+- **Install:** WSL2 Ubuntu, running as root. steamcmd is in `/opt/steamcmd` and the game in `/opt/dota2`. The user logs in to steamcmd themselves.
+- **Launch:**
+  - Run `game/bin/linuxsteamrt64/dota2` directly. `dota.sh` stops with a FATAL error because it needs the Steam "sniper" runtime.
+  - Set `LD_LIBRARY_PATH=bin/linuxsteamrt64` and `ENABLE_PATHMATCH=1`.
+  - Copy `/opt/steamcmd/linux64/steamclient.so` to `/root/.steam/sdk64/`. Without it, Steamworks init fails with a FATAL error.
+- **Script:** `headless_full.sh <run> <timescale> [port]` (kept in `C:\Users\Public`, copied to `/opt/oha-runs`).
+  - It feeds console commands through a fifo.
+  - When the pick phase starts, it loads `bots/tools/match_recorder`.
+  - It stops the server after the `MATCHREC` line.
+  - The bot scripts are a copy in `/opt/dota2/game/dota/scripts/vscripts/bots`. Copy them again after every change.
+- **Speed:** at `host_timescale 8`, the game runs at about 7.3x real time on one core (94% CPU) and uses about 1.2 GB of RAM. The Windows client manages only 2–3x, because it renders every tick.
+- **Parallel:** `headless_par.sh <n> <timescale>` starts n games on separate ports and logs memory use.
 
 ### Step 1: decision log (built)
 
@@ -142,18 +157,35 @@ Use exploration only in data games, never in eval games.
 
 It writes `datasets/fight_decisions.csv` (gitignored) and prints a summary of death and kill rates for each action.
 
-### Step 2: parallel game runner (planned, needs step 0)
+### Step 2: parallel game runner (built)
 
-- **Install:** one read-only Linux Dota install, with a separate writable `bots/` folder per game. Each game gets its own `general.lua`, written by `match-setup.js`.
-- **Runner:** a Node or Python script that:
-  - starts N headless games with given settings;
-  - kills and restarts any that hang;
-  - collects the logs into `results/<batch>/`;
-  - runs `npm run report` and `npm run decisions` on the batch.
-- **Eval batch:** the 8-game screen or 32-game confirm rotation, all at once.
-- **Data batch:** random lineups from the measurement list, `--explore=0.03`, with the plain OHA side logged too.
+`npm run batch` (`typescript/post-process/batch.js`, with `headless/game.sh` and `headless/batch.sh`):
 
-**Estimated capacity:** each instance takes about 1–2 cores and 2–4 GB of RAM, so about 4–6 games at once on an 8-core, 32 GB PC and 15–20 on a 32-core cloud machine.
+```
+npm run batch -- start 1-8 arbiter,laning,group,roam,humanfeel,escape [--parallel=8] [--timescale=8] [--explore=0.03] [--name=]
+npm run batch -- status [<name>]
+npm run batch -- report [<name>]
+npm run decisions -- datasets/runs/<name>
+```
+
+- **Settings per game:** `match-setup.js --out=<dir>` writes each game's `general.lua` and `utils.lua` (lineup pair, side rotation, flags, decision log) into `datasets/runs/<name>/cfg/g<n>/`. The repo files are not touched.
+- **Install:** one Linux Dota install. Each game gets its own copy of the repo's `bots` folder, bind-mounted over `vscripts/bots` in a private mount namespace (`unshare -m`), so games with different settings run side by side. The batch uses the `bots` folder as it was at start.
+- **Queue:** at most `--parallel` games at once. A game is stopped after its `MATCHREC` line, or after 40 real minutes.
+- **Output:** `datasets/runs/<name>/` gets `manifest.json`, `console.g<n>.log` per finished game, `status.log` and `mem.log`. `report` prints winner, length, kills and 10-minute net worth per game and the new team's win count.
+- **Eval batch:** the 8-game screen or the 32-game confirm rotation.
+- **Data batch:** same, with `--explore=0.03`. Both teams are logged.
+
+**Measured (i9-14900HX, WSL with 15 GB):**
+
+| Games at once | Speed per game | Total | RAM |
+|---|---|---|---|
+| 1 | about 5.7x over a full game (7.3x early) | 5.7x | about 1.2 GB |
+| 4 | about 4.6x | about 16x | about 4.3 GB |
+| 8 | about 3.6x | about 24x | about 8 GB |
+
+`host_timescale 16` is no faster than 8 for one game: the server uses one full core.
+
+**Not done yet:** restarting a game that hangs (it is stopped at 40 minutes and reported as "no MATCHREC").
 
 ### Step 3: learning loop (planned)
 
@@ -227,5 +259,8 @@ A report script ranks spells and heroes by:
 
 ## 7. Status log
 
+- **2026-11-15:** steps 0 and 2 done. Headless Linux Dota runs in WSL; 8 games at once give about 24x real time.
+  First batch, `screen-rec6` (games 1-8, flags arbiter, laning, group, roam, humanfeel, escape): the new team won 3 of 8, 0 errors, 58,353 decisions.
+  The new team was behind in net worth at 10 minutes in 7 of 8 games (about 1,700 on average), so its early game needs a look.
 - **2026-11-15:** step 5 (per-hero skill use: spell log, scripted fixes, learned cast-or-hold per spell type) added as the agreed next improvement after the team-level work.
 - **2026-11-15:** spec written and step 1 built. Bisect game 4 started before the build, so the first logged game is game 5 (9091057862): 6,541 decisions, no errors, both teams logged. The data-game exploration default was lowered from 10% to 3%.

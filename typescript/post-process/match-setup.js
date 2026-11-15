@@ -5,6 +5,8 @@
 //   npm run match -- play none                   same, every flag off (baseline OHA with debug prints)
 //   npm run match -- reset                       put general.lua and utils.lua back as they were
 //   ... --explore=0.03                           data game: bots sometimes force a random fight / run
+//   ... --out=<dir>                              write general.lua and utils.lua under <dir> (Customize/, FunLib/)
+//                                                instead of editing the repo; no backups (used by npm run batch)
 //
 // Every setup also turns on the fight decision log (Customize.DecisionLog; FIGHTDEC / FIGHTOUT lines,
 // docs/specs/learned-fight-decisions.md), with explore 0 unless --explore is given.
@@ -36,11 +38,25 @@ function fail(msg) {
 
 const rawArgs = process.argv.slice(2);
 let explore = 0;
+let outDir = null;
 const args = rawArgs.filter(a => {
     const m = a.match(/^--explore=([0-9.]+)$/);
     if (m) explore = Number(m[1]);
-    return !m;
+    const o = a.match(/^--out=(.+)$/);
+    if (o) outDir = path.resolve(o[1]);
+    return !m && !o;
 });
+// With --out: read the clean file (the backup, if a setup is active in the repo) and write under outDir.
+const readCfg = p => fs.readFileSync(outDir && fs.existsSync(backup(p)) ? backup(p) : p, "utf8");
+const writeCfg = (p, text) => {
+    const dst = outDir ? path.join(outDir, path.relative(path.join(root, "bots"), p)) : p;
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.writeFileSync(dst, text);
+};
+const keepBackups = () => {
+    if (outDir) return;
+    for (const p of [generalPath, utilsPath]) if (!fs.existsSync(backup(p))) fs.copyFileSync(p, backup(p));
+};
 if (!(explore >= 0 && explore <= 1)) fail("--explore must be between 0 and 1");
 // Customize.DecisionLog: logging on for every match setup.
 const withDecisionLog = text => {
@@ -71,21 +87,21 @@ const parseFlags = arg => {
     return on;
 };
 const setDebugMode = () => {
-    const utils = fs.readFileSync(utilsPath, "utf8");
+    const utils = readCfg(utilsPath);
     if (!/____exports\.DebugMode = (true|false)/.test(utils)) fail("Could not find DebugMode in bots/FunLib/utils.lua");
-    fs.writeFileSync(utilsPath, utils.replace(/____exports\.DebugMode = (true|false)/, "____exports.DebugMode = true"));
+    writeCfg(utilsPath, utils.replace(/____exports\.DebugMode = (true|false)/, "____exports.DebugMode = true"));
 };
 
 if (args[0] === "play") {
     const on = parseFlags(args[1]);
-    for (const p of [generalPath, utilsPath]) if (!fs.existsSync(backup(p))) fs.copyFileSync(p, backup(p));
-    let text = fs.readFileSync(generalPath, "utf8");
+    keepBackups();
+    let text = readCfg(generalPath);
     const nl = text.includes("\r\n") ? "\r\n" : "\n";
     const row = FLAGS.map(f => `${f} = ${on.includes(f)}`).join(", ");
     const re = /Customize\.Behavior = \{[\s\S]*?\n\}/;
     if (!re.test(text)) fail("Could not find Customize.Behavior in general.lua");
     text = text.replace(re, `Customize.Behavior = {${nl}    Radiant = { ${row} },${nl}    Dire    = { ${row} },${nl}}`);
-    fs.writeFileSync(generalPath, withDecisionLog(text));
+    writeCfg(generalPath, withDecisionLog(text));
     setDebugMode();
     console.log(`Play setup: flags on both teams (${on.length ? on.join(", ") : "none: baseline OHA"}); heroes as in general.lua. Debug prints on.`);
     console.log("When done: npm run match -- reset");
@@ -115,11 +131,11 @@ const radiantSide = rotation === 1 || rotation === 4 ? "A" : "B";
 const direSide = radiantSide === "A" ? "B" : "A";
 const newTeam = rotation === 1 || rotation === 3 ? "Radiant" : "Dire";
 
-for (const p of [generalPath, utilsPath]) if (!fs.existsSync(backup(p))) fs.copyFileSync(p, backup(p));
+keepBackups();
 
 // general.lua
 const eol = s => (s.includes("\r\n") ? "\r\n" : "\n");
-let general = fs.readFileSync(generalPath, "utf8");
+let general = readCfg(generalPath);
 const nl = eol(general);
 const heroTable = (name, heroes) =>
     `Customize.${name} = {${nl}${heroes.map(h => `    'npc_dota_hero_${h}',`).join(nl)}${nl}}`;
@@ -136,12 +152,10 @@ general = replaceTable(
     "Behavior",
     `Customize.Behavior = {${nl}    Radiant = { ${flagRow(newTeam === "Radiant")} },${nl}    Dire    = { ${flagRow(newTeam === "Dire")} },${nl}}`
 );
-fs.writeFileSync(generalPath, withDecisionLog(general));
+writeCfg(generalPath, withDecisionLog(general));
 
 // utils.lua: DebugMode on, for the thrash counter
-const utils = fs.readFileSync(utilsPath, "utf8");
-if (!/____exports\.DebugMode = (true|false)/.test(utils)) fail("Could not find DebugMode in bots/FunLib/utils.lua");
-fs.writeFileSync(utilsPath, utils.replace(/____exports\.DebugMode = (true|false)/, "____exports.DebugMode = true"));
+setDebugMode();
 
 console.log(`Game ${game}: pair ${pair}, rotation ${rotation}`);
 console.log(`  Radiant: lineup ${radiantSide}  ${lineup[radiantSide].join(", ")}${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);

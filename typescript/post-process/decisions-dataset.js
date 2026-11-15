@@ -2,6 +2,7 @@
 //
 //   npm run decisions                         every console.<matchid>.log in <dota>/game/dota
 //   npm run decisions -- <log>...             the given logs
+//   npm run decisions -- datasets/runs/<name>  every log of a headless batch (npm run batch)
 //   npm run decisions -- --out=<file.csv>     output path (default datasets/fight_decisions.csv)
 //
 // Joins each FIGHTDEC line with its FIGHTOUT line (same id) and adds the match ID, whether the bot's team
@@ -17,6 +18,9 @@ const files = [];
 for (const a of process.argv.slice(2)) {
     const m = a.match(/^--out=(.+)$/);
     if (m) out = path.resolve(m[1]);
+    else if (fs.existsSync(a) && fs.statSync(a).isDirectory())
+        // a batch folder (npm run batch): every console.g<n>.log in it
+        for (const f of fs.readdirSync(a).filter(f => /^console.*\.log$/.test(f))) files.push(path.join(a, f));
     else files.push(a);
 }
 const logs = files.length
@@ -40,7 +44,10 @@ const summary = [];
 for (const log of logs) {
     const text = fs.readFileSync(log, "utf8");
     if (!text.includes("FIGHTDEC ")) continue;
-    const matchId = (path.basename(log).match(/console\.(\d+)\.log/) || [])[1] || path.basename(log);
+    // console.<matchid>.log from the client; console.g<n>.log in a batch folder becomes <batch>-g<n>
+    const matchId =
+        (path.basename(log).match(/console\.(\d+)\.log/) || [])[1] ||
+        `${path.basename(path.dirname(log))}-${path.basename(log).replace(/^console\.|\.log$/g, "")}`;
     let rec = null;
     const decs = new Map();
     const outs = new Map();
