@@ -58,6 +58,7 @@ const STEPOUT_MAX = 800; // never walk back further than this
 const STEPOUT_TIME = 1.2; // the burst lasts at most this long
 const STEPOUT_RANGE_GAP = 50; // only enemies whose range beats ours by more than this
 const STEPOUT_MAX_HP = 0.8; // above this health fraction, keep laning through harass (tunable)
+const BURST_MIN_HP = 0.55; // below this health fraction no burst runs, so retreat can take the bot (tunable)
 const LAST_HIT_SEARCH_MIN = 600;
 const OTHERS_DPS_SHARE = 0.8; // share of the attackers' damage per second expected to land in the window
 
@@ -473,6 +474,16 @@ export function BurstDesire(bot: Unit): number {
         if (state.burst !== "none") EndBurst(bot, state);
         bot.laningHoldUntil = now + 0.5;
         return Tier(bot, "burst.pull", pull);
+    }
+
+    // A hurt or retreating bot never starts or stays in a burst: a burst bids HIGH (disengage up to 1.0), plus the
+    // arbiter's incumbent bonus, which can outbid retreat's lane rules. Overnight batches 2026-11-15: 6 flags,
+    // deaths before 10:00 per game against plain OHA +2.3 (screen-rec6) and +2.7 (data1); with this rule +1.5,
+    // and 8 wins in 15 games (fixlane1).
+    const active = bot.GetActiveMode();
+    if (jmz.GetHP(bot) < BURST_MIN_HP || active === BotMode.Retreat || active === BotMode.EvasiveManeuvers) {
+        if (state.burst !== "none") EndBurst(bot, state);
+        return 0;
     }
 
     if (state.burst !== "none" && now >= state.burstUntil) EndBurst(bot, state);

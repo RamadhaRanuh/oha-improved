@@ -149,6 +149,7 @@ local STEPOUT_MAX = 800
 local STEPOUT_TIME = 1.2
 local STEPOUT_RANGE_GAP = 50
 local STEPOUT_MAX_HP = 0.8
+local BURST_MIN_HP = 0.55
 local LAST_HIT_SEARCH_MIN = 600
 local OTHERS_DPS_SHARE = 0.8
 states = {}
@@ -685,6 +686,13 @@ function ____exports.BurstDesire(bot)
         end
         bot.laningHoldUntil = now + 0.5
         return Tier(bot, "burst.pull", pull)
+    end
+    local active = bot:GetActiveMode()
+    if jmz.GetHP(bot) < BURST_MIN_HP or active == BotMode.Retreat or active == BotMode.EvasiveManeuvers then
+        if state.burst ~= "none" then
+            EndBurst(bot, state)
+        end
+        return 0
     end
     if state.burst ~= "none" and now >= state.burstUntil then
         EndBurst(bot, state)
