@@ -455,7 +455,7 @@ function ledger(filter) {
         const started = String(r.m.started || "").slice(5, 16).replace("T", " ");
         console.log(
             `${started.padEnd(13)}${n.padEnd(26)}${(r.screen ? "scrn" : r.kind).padEnd(6)}${String(r.m.flags).padEnd(30)}${String(r.m.commit || "?").padEnd(14)}` +
-                `${`${r.played}/${r.total}`.padEnd(8)}${String(r.won).padEnd(7)}${(r.played ? pct(r.won / r.played) : "-").padEnd(7)}${gold}`
+                `${`${r.played}/${r.total}`.padEnd(8)}${(r.screen ? "-" : String(r.won)).padEnd(7)}${(r.played && !r.screen ? pct(r.won / r.played) : "-").padEnd(7)}${gold}`
         );
     }
 }
