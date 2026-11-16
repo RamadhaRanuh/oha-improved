@@ -8,10 +8,11 @@
  * the hero's hp, and retreat (0.4-0.6) never beats it. So, from mode_roshan_generic's GetDesire:
  *   - lowhp: a hero under LOW_HP bids 0 for Roshan (retreat takes over), unless Roshan is under
  *     FINISH_ROSH_HP and the hero above FINISH_HP (finish it, the Aegis is one more hit-window away).
- *   - abort: the team gives up the attempt for ABORT_TIME s when it is failing: in mode 20 at the pit
- *     for more than SLOW_TIME s with Roshan still above SLOW_ROSH_HP (abort_slow), or ABORT_DEATHS
- *     allies died in mode 20 at the pit during this attempt (abort_deaths). The same finish exception holds.
- * The stricter damage check (60 s instead of 90 s) is in mode_roshan_generic's TeamHasRoshanDPS.
+ *   - abort_deaths: the team gives up the attempt for ABORT_TIME s once ABORT_DEATHS allies died in
+ *     mode 20 at the pit during this attempt. The same finish exception holds.
+ * v1 also aborted slow attempts (40 s at the pit, Roshan above 50%) and used a 60 s damage check.
+ * ev-gfc-roshsafe (32 games): Roshan deaths after 30:00 0.84 -> 0.03 a game, but -1.8k gold at 30:00
+ * and -3 points of wins; abort_slow fired ~9 times a game and threw attempts and farm time away. Both removed.
  *
  * Team state lives here because required modules are shared by a team's bots (one VM per team);
  * the mode file is per bot.
@@ -31,24 +32,19 @@ const FINISH_HP = 0.2;
 const PIT_RADIUS = 1200; // a hero in mode 20 this close to a Roshan pit is at the pit
 const ATTEMPT_GAP = 10; // the attempt ends when nobody was in mode 20 at the pit for this long
 const DEATH_WINDOW = 3; // a death counts when the hero was in mode 20 at the pit this recently
-const SLOW_TIME = 40;
-const SLOW_ROSH_HP = 0.5;
 const ABORT_DEATHS = 2;
 const ABORT_TIME = 60;
 const ROSH_HP_FRESH = 3; // Roshan's hp is known when a bot saw it this recently
 const UPDATE_GAP = 0.2;
 const LOG_GAP = 5;
-export const DPS_LOG_GAP = 30; // the `dps` line, per team
 
 let updatedAt = -999;
 let attemptStart = -1;
 let lastAtPit = -999;
 let deaths = 0;
 let abortUntil = -999;
-let abortWhy = "";
 let roshHp = 1;
 let roshHpAt = -999;
-let dpsLogAt = -999;
 const inRoshan: Record<number, number> = {}; // player id -> last time alive in mode 20 at the pit
 const wasAlive: Record<number, boolean> = {};
 const logAt: Record<string, number> = {};
@@ -111,15 +107,11 @@ function Update(now: number): void {
     }
     if (attemptStart < 0) return;
 
-    const rhp = KnownRoshHp(now);
-    let why = "";
-    if (deaths >= ABORT_DEATHS) why = "abort_deaths";
-    else if (now - attemptStart > SLOW_TIME && rhp > SLOW_ROSH_HP) why = "abort_slow";
-    if (why === "") return;
+    if (deaths < ABORT_DEATHS) return;
     abortUntil = now + ABORT_TIME;
-    abortWhy = why;
     if (Utils.DebugMode) {
-        print(`ROSHSAFE team=${GetTeam()} t=${Math.floor(now)} abort why=${why} dur=${Math.floor(now - attemptStart)} deaths=${deaths} roshhp=${rhp.toFixed(2)}`);
+        const rhp = KnownRoshHp(now);
+        print(`ROSHSAFE team=${GetTeam()} t=${Math.floor(now)} abort why=abort_deaths dur=${Math.floor(now - attemptStart)} deaths=${deaths} roshhp=${rhp.toFixed(2)}`);
     }
     EndAttempt();
 }
@@ -131,14 +123,6 @@ export function Log(bot: Unit, why: string, now: number): void {
     if (now - (logAt[name] ?? -999) < LOG_GAP) return;
     logAt[name] = now;
     print(`ROSHSAFE team=${GetTeam()} hero=${name} t=${Math.floor(now)} why=${why} hp=${jmz.GetHP(bot).toFixed(2)} roshhp=${KnownRoshHp(now).toFixed(2)}`);
-}
-
-/** The `dps` line: once per DPS_LOG_GAP s per team (and LOG_GAP per hero). */
-export function LogDps(bot: Unit): void {
-    const now = DotaTime();
-    if (now - dpsLogAt < DPS_LOG_GAP) return;
-    dpsLogAt = now;
-    Log(bot, "dps", now);
 }
 
 /**
@@ -159,7 +143,7 @@ export function Filter(bot: Unit, desire: number, roshan: Unit | undefined): num
     const finish = rhp >= 0 && rhp < FINISH_ROSH_HP && hp > FINISH_HP;
     if (finish) return desire;
     if (now < abortUntil) {
-        Log(bot, abortWhy, now);
+        Log(bot, "abort_deaths", now);
         return 0;
     }
     if (hp < LOW_HP) {

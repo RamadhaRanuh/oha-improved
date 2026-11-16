@@ -7,7 +7,7 @@ local Customize = require( GetScriptDirectory()..'/Customize/general' )
 -- Behaviour flag `group`: Roshan before a high-ground push the numbers do not allow (behavior/siege).
 local bGroupFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group')
 local Siege = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/siege') or nil
--- Behaviour flag `roshsafe`: no Roshan bid at low hp, team abort of a failing attempt, 60 s DPS check (behavior/roshsafe).
+-- Behaviour flag `roshsafe`: no Roshan bid at low hp, team abort after deaths at the pit (behavior/roshsafe).
 local bRoshSafe = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('roshsafe')
 local RoshSafe = bRoshSafe and require(GetScriptDirectory()..'/FunLib/behavior/roshsafe') or nil
 -- Own Roshan handle for roshsafe, refreshed when the old one died (`Roshan` below is found once and never again).
@@ -60,10 +60,7 @@ end
 -- 9089630662: blocked=low_dps 121 times, Roshan never taken. Here: the team's summed right-click DPS,
 -- with Dota's armor formula, must kill Roshan within ROSH_KILL_TIME seconds.
 local ROSH_KILL_TIME = 90 -- right-clicks only (spells and items add more), and the Roshan stats above are rough (tunable)
--- Behaviour flag `roshsafe`: 60 s. After 30:00 the new team was wiped by Roshan itself 13 times in 190 games:
--- the 90 s window sent teams that could not kill it before it killed them.
-local ROSH_KILL_TIME_SAFE = 60
-local function TeamHasRoshanDPS(heroes, nKillTime)
+local function TeamHasRoshanDPS(heroes)
 	local nMinute = math.floor(DotaTime() / 60)
 	local nHealth = 6000 + 260 * nMinute
 	local nDPS = 0
@@ -72,7 +69,7 @@ local function TeamHasRoshanDPS(heroes, nKillTime)
 		local nMul = 1 - (0.06 * nArmor) / (1 + 0.06 * math.abs(nArmor))
 		nDPS = nDPS + h:GetAttackDamage() * h:GetAttackSpeed() * nMul
 	end
-	return nDPS * (nKillTime or ROSH_KILL_TIME) >= nHealth
+	return nDPS * ROSH_KILL_TIME >= nHealth
 end
 
 function GetDesireHelper()
@@ -172,15 +169,7 @@ function GetDesireHelper()
         end
     end
 
-    if bGroupFlag and bRoshSafe then
-        if not initDPSFlag then
-            if TeamHasRoshanDPS(aliveHeroesList, ROSH_KILL_TIME_SAFE) then
-                initDPSFlag = true
-            elseif shouldKillRoshan and TeamHasRoshanDPS(aliveHeroesList) then
-                RoshSafe.LogDps(bot) -- the 90 s check would have passed
-            end
-        end
-    elseif (bGroupFlag and TeamHasRoshanDPS(aliveHeroesList)) or (not bGroupFlag and J.HasEnoughDPSForRoshan(aliveHeroesList))
+    if (bGroupFlag and TeamHasRoshanDPS(aliveHeroesList)) or (not bGroupFlag and J.HasEnoughDPSForRoshan(aliveHeroesList))
     then
         initDPSFlag = true
     end

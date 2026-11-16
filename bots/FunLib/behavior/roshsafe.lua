@@ -26,23 +26,18 @@ local FINISH_HP = 0.2
 local PIT_RADIUS = 1200
 local ATTEMPT_GAP = 10
 local DEATH_WINDOW = 3
-local SLOW_TIME = 40
-local SLOW_ROSH_HP = 0.5
 local ABORT_DEATHS = 2
 local ABORT_TIME = 60
 local ROSH_HP_FRESH = 3
 local UPDATE_GAP = 0.2
 local LOG_GAP = 5
-____exports.DPS_LOG_GAP = 30
 local updatedAt = -999
 local attemptStart = -1
 local lastAtPit = -999
 local deaths = 0
 local abortUntil = -999
-local abortWhy = ""
 local roshHp = 1
 local roshHpAt = -999
-local dpsLogAt = -999
 local inRoshan = {}
 local wasAlive = {}
 local logAt = {}
@@ -113,20 +108,13 @@ local function Update(now)
     if attemptStart < 0 then
         return
     end
-    local rhp = KnownRoshHp(now)
-    local why = ""
-    if deaths >= ABORT_DEATHS then
-        why = "abort_deaths"
-    elseif now - attemptStart > SLOW_TIME and rhp > SLOW_ROSH_HP then
-        why = "abort_slow"
-    end
-    if why == "" then
+    if deaths < ABORT_DEATHS then
         return
     end
     abortUntil = now + ABORT_TIME
-    abortWhy = why
     if Utils.DebugMode then
-        print((((((((((("ROSHSAFE team=" .. tostring(GetTeam())) .. " t=") .. tostring(math.floor(now))) .. " abort why=") .. why) .. " dur=") .. tostring(math.floor(now - attemptStart))) .. " deaths=") .. tostring(deaths)) .. " roshhp=") .. __TS__NumberToFixed(rhp, 2))
+        local rhp = KnownRoshHp(now)
+        print((((((((("ROSHSAFE team=" .. tostring(GetTeam())) .. " t=") .. tostring(math.floor(now))) .. " abort why=abort_deaths dur=") .. tostring(math.floor(now - attemptStart))) .. " deaths=") .. tostring(deaths)) .. " roshhp=") .. __TS__NumberToFixed(rhp, 2))
     end
     EndAttempt()
 end
@@ -148,15 +136,6 @@ function ____exports.Log(bot, why, now)
         2
     ))
 end
---- The `dps` line: once per DPS_LOG_GAP s per team (and LOG_GAP per hero).
-function ____exports.LogDps(bot)
-    local now = DotaTime()
-    if now - dpsLogAt < ____exports.DPS_LOG_GAP then
-        return
-    end
-    dpsLogAt = now
-    ____exports.Log(bot, "dps", now)
-end
 --- mode_roshan_generic's desire after the roshsafe rules. Called every frame from each bot's GetDesire
 -- (that also keeps the team state current). `roshan`: the bot's Roshan handle, or nil.
 function ____exports.Filter(bot, desire, roshan)
@@ -176,7 +155,7 @@ function ____exports.Filter(bot, desire, roshan)
         return desire
     end
     if now < abortUntil then
-        ____exports.Log(bot, abortWhy, now)
+        ____exports.Log(bot, "abort_deaths", now)
         return 0
     end
     if hp < LOW_HP then
