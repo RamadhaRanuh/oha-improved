@@ -9,6 +9,8 @@ local Fight = bFightFlag and require(GetScriptDirectory()..'/FunLib/behavior/fig
 -- Fight decision log for the learned policy (behavior/decision_log; Customize.DecisionLog), all bots.
 local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
 if not DecisionLog.Active() then DecisionLog = nil end
+-- Debug trace (behavior/trace): POS / ITEM / CAST lines for each bot hero, Utils.DebugMode only.
+local Trace = J.Utils.DebugMode and require(GetScriptDirectory()..'/FunLib/behavior/trace') or nil
 local tBehaviorErrors = {}
 local function SafeCall(sName, fn, ...)
 	local ok, res = pcall(fn, ...)
@@ -220,6 +222,7 @@ function GetDesire()
     end
     CountWhy()
     TrackDeath(res)
+    if Trace ~= nil then SafeCall('trace', Trace.Tick, bot) end
     -- J.Utils.SetCachedVars(cacheKey, res)
     return res
 end

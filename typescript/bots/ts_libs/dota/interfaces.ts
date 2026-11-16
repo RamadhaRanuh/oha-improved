@@ -189,6 +189,7 @@ export interface Unit {
 
 export interface Ability {
     IsFullyCastable(): boolean;
+    GetLevel(): number;
     IsHidden(): boolean;
 
     GetCastRange(): number;
