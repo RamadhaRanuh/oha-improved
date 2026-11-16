@@ -42,6 +42,11 @@ A missing table or key counts as off.
 | `roam` | Smoke ganks, counter-gank teleports | `behavior/gank` |
 | `humanfeel` | Varied pre-horn plans (feint, bounty steal, ambush, camp block), per-game randomness | `behavior/prehorn`, `behavior/rng` |
 | `escape` | Retreat route that keeps away from chasing enemies | `behavior/escape` |
+| `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
+| `noregroup` | With `group`: no regroup walk to the rally point (in test) | `behavior/group` |
+| `farmfree` | With `group`: farming is not moved off the enemy half when enemies are missing (in test) | `mode_farm_generic.lua` |
+
+**Tested and removed (2026-11-16, 32-game eval batches against `group`):** `bail` (group roles dropped below 55% health; 13/32 vs 18/32), `yield` (retreat outbids attack and group modes below 45% health; 14/32 vs 15/32), `siegecut` (a hero lead alone no longer opens high ground; 15/32 vs 17/32). How changes are tested and judged: [TESTING.md](TESTING.md).
 
 ### Match tooling
 
@@ -229,6 +234,8 @@ Earlier rounds fixed the following:
 - a lane engage capping lane retreat.
 
 ## 5. Tests and debugging
+
+Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTING.md](TESTING.md).
 
 - Each module has a Lua unit test with stubbed game APIs (kept outside the repo). The current runs:
 
