@@ -11,10 +11,6 @@ local bot = GetBot();
 local X = {}
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func')
 local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
-local bRetreatFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('retreat')
--- Jungle after too many lane deaths (behavior/jungle, flag `farm`).
-local Jungle = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('farm') and require(GetScriptDirectory()..'/FunLib/behavior/jungle') or nil
-local bJungling = false
 -- Behaviour flag `group`: commit windows at high ground (behavior/siege) and no lone farming in the
 -- enemy half while enemies are missing (behavior/alone).
 local bGroupFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group')
@@ -23,7 +19,6 @@ local bFixesFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn(
 local Siege = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/siege') or nil
 local Alone = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/alone') or nil
 local bAloneSafe = false -- farming was moved to our half: Think skips the lane creeps around the bot
-local nJungleCampsMinute = nil
 local RB = Vector(-7174.000000, -6671.00000, 0.000000)
 local DB = Vector(7023.000000, 6450.000000, 0.000000)
 
@@ -145,35 +140,6 @@ function GetDesireHelper()
 		beNormalFarmer = J.GetPosition(bot) == 3
 		beHighFarmer = J.GetPosition(bot) == 2
 		beVeryHighFarmer = J.GetPosition(bot) == 1
-	end
-
-	-- Behaviour flag `farm`: jungling after too many lane deaths, also in the laning phase (behavior/jungle).
-	if Jungle ~= nil then
-		local nJungle = Jungle.Desire(bot)
-		bJungling = nJungle > 0
-		if bJungling then
-			local nMode = bot:GetActiveMode()
-			if not bot:IsAlive()
-			or ((nMode == BOT_MODE_RETREAT or nMode == BOT_MODE_SECRET_SHOP or nMode == BOT_MODE_RUNE
-				or nMode == BOT_MODE_WARD or nMode == BOT_MODE_OUTPOST) and bot:GetActiveModeDesire() > 0)
-			then
-				return BOT_MODE_DESIRE_NONE
-			end
-			if #J.GetEnemiesNearLoc(bot:GetLocation(), 1200) > 0 and not J.WeAreStronger(bot, 1200) then
-				return BOT_MODE_DESIRE_NONE
-			end
-			-- Own camps only, refreshed once a minute (camps respawn on the minute). OHA's own refresh
-			-- does not run in the laning phase, and its level filter lets every camp through.
-			local nMinute = math.floor(DotaTime() / 60)
-			if nJungleCampsMinute ~= nMinute and DotaTime() % 60 >= 1 then
-				nJungleCampsMinute = nMinute
-				J.Role['availableCampTable'] = Jungle.Camps(bot, J.Site.RefreshCamp(bot))
-				preferedCamp = nil
-			end
-			availableCamp = J.Role['availableCampTable']
-			if preferedCamp == nil then preferedCamp = J.Site.GetClosestNeutralSpwan(bot, availableCamp) end
-			return nJungle
-		end
 	end
 
 	local LoneDruid = J.CheckLoneDruid()
@@ -618,15 +584,6 @@ function Think()
 
 	hLaneCreepList = bot:GetNearbyLaneCreeps(900, true) -- always refresh to avoid stale data
 	if bAloneSafe then hLaneCreepList = {} end
-	if bJungling then
-		-- Jungling: camps only, not the lane we left; wait beside a camp while all are cleared.
-		hLaneCreepList = {}
-		if preferedCamp == nil then preferedCamp = J.Site.GetClosestNeutralSpwan(bot, availableCamp) end
-		if preferedCamp == nil then
-			local vWait = Jungle.WaitSpot(bot, Jungle.Camps(bot, J.Site.RefreshCamp(bot)))
-			if vWait ~= nil then bot:Action_MoveToLocation(vWait) return end
-		end
-	end
 	if hLaneCreepList ~= nil and #hLaneCreepList > 0 and J.IsValid(hLaneCreepList[1]) then
 		local farmTarget = J.Site.GetFarmLaneTarget(hLaneCreepList);
 		local nSearchRange = bot:GetAttackRange() + 180
@@ -1061,9 +1018,6 @@ function X.ShouldRun(bot)
 	then
 		if botTarget ~= nil and botTarget:IsHero()
 		   and J.GetHP(botTarget) > 0.35
-		   -- Behaviour flag `retreat`: only an actual chase counts (same rule as mode_retreat_generic). GetTarget()
-		   -- keeps the last hero any mode set long after the fight.
-		   and (not bRetreatFlag or bot:GetAttackTarget() == botTarget or J.IsChasingTarget(bot, botTarget))
 		   and (  not J.IsInRange(bot,botTarget,bot:GetAttackRange() + 150) 
 				  or not J.CanKillTarget(botTarget, bot:GetAttackDamage() * 2.33, DAMAGE_TYPE_PHYSICAL) )
 		then

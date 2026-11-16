@@ -67,8 +67,6 @@ local Utils = require(GetScriptDirectory().."/FunLib/utils")
 local ____desire_tiers = require(GetScriptDirectory().."/FunLib/behavior/desire_tiers")
 local DesireTier = ____desire_tiers.DesireTier
 local Pull = require(GetScriptDirectory().."/FunLib/behavior/pull")
-local Jungle = require(GetScriptDirectory().."/FunLib/behavior/jungle")
-local Flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
 function StateOf(bot)
     local key = (tostring(bot:GetPlayerID()) .. ":") .. bot:GetUnitName()
     local state = states[key]
@@ -627,9 +625,6 @@ function ____exports.GetDesire(bot)
     if mode == 11 or mode == 21 then
         return 1
     end
-    if Jungle.Active(bot) then
-        return DesireTier.LOW
-    end
     if jmz.IsInLaningPhase() then
         return Tier(bot, "moderate", DesireTier.MODERATE)
     end
@@ -672,7 +667,7 @@ end
 function ____exports.BurstDesire(bot)
     local state = StateOf(bot)
     local now = DotaTime()
-    if not jmz.IsInLaningPhase() or not bot:IsAlive() or Jungle.Active(bot) then
+    if not jmz.IsInLaningPhase() or not bot:IsAlive() then
         if state.burst ~= "none" then
             EndBurst(bot, state)
         end
@@ -722,7 +717,7 @@ function ____exports.BurstDesire(bot)
         end
         return Tier(bot, "burst." .. state.burst, state.burst == "disengage" and state.burstDesire or DesireTier.HIGH)
     end
-    if bot:GetActiveMode() == BotMode.Attack and jmz.IsCore(bot) and not Flags.IsOn("fight") then
+    if bot:GetActiveMode() == BotMode.Attack and jmz.IsCore(bot) then
         local attackDesire = bot:GetActiveModeDesire()
         local fightTarget = FightTarget(bot)
         local ____temp_0

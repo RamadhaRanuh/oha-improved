@@ -129,10 +129,8 @@ Customize.ThinkLess = 1;
 -- Behaviour feature flags per team. All false = baseline behaviour (commit cb814c6).
 -- These are for testing the new behaviour code (docs/specs/smarter-bot-behaviour.md); leave them off for normal play.
 Customize.Behavior = {
-    Radiant = { arbiter = false, laning = false, fight = false, retreat = false,
-                group = false, farm = false, roam = false, humanfeel = false },
-    Dire    = { arbiter = false, laning = false, fight = false, retreat = false,
-                group = false, farm = false, roam = false, humanfeel = false },
+    Radiant = { arbiter = false, laning = false, group = false, roam = false, humanfeel = false },
+    Dire    = { arbiter = false, laning = false, group = false, roam = false, humanfeel = false },
 }
 
 -- Fight decision log (docs/specs/learned-fight-decisions.md): FIGHTDEC / FIGHTOUT lines for every bot, as

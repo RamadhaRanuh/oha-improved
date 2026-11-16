@@ -1,13 +1,17 @@
 /**
- * Cancel a TP into a lost fight (flag `retreat`; asked for after the S1 playtests, as Ryndrb's bots do).
+ * Cancel a TP into a lost fight (asked for after the S1 playtests, as Ryndrb's bots do).
  *
  * Plain OHA casts a TP scroll and always lets it finish, even when the enemy team gathers on the
  * landing spot during the 3 s channel: the bot lands in five heroes and dies. A human watches the
  * minimap and cancels. So:
- *   - Every TP cast records its destination (ability_item_usage_generic X.SetUseItem, behavior/gank).
+ *   - Every TP cast records its destination (behavior/gank).
  *   - Before casting: a TP is not started into a spot that is already a lost fight (Blocked).
- *   - While channeling (ItemUsageThink, every frame): if the landing spot became a lost fight, stop
+ *   - While channeling (Check, every frame): if the landing spot became a lost fight, stop
  *     (Action_ClearActions(true)) and do not TP near that spot again for BLOCK_TIME s.
+ *
+ * Callers: behavior/gank (flag `roam`) uses Blocked and Record for counter-gank TPs. The item-usage
+ * hooks (Record on every TP, Check every frame) belonged to flag `retreat`, removed 2026-11-17, so
+ * nothing calls Check now and the BLOCK_TIME block never starts.
  *
  * Lost fight at `loc`: at least MIN_ENEMIES living enemy heroes seen within DANGER_RADIUS of it in the
  * last SEEN_TIME s, and more of them than allies there + us + our buildings there (tower, ancient). A
