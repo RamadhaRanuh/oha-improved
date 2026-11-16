@@ -6,6 +6,7 @@
 //   npm run batch -- report [<name>]       result per game, per lineup pair, and the verdict
 //   npm run batch -- compare <a> <b>       win rate of batch a against batch b (b is the baseline; b1+b2 pools baselines)
 //   npm run batch -- stop <name>           stop a batch: its queue, its games, its port locks
+//   npm run batch -- ledger [<filter>]     one line per batch: kind, flags, commit, games, wins, gold lead at 30:00
 //
 // <games> are measurement game numbers as in `npm run match` (lineup pair and side rotation), e.g. 1-8 or 1,2,5.
 // Games come in whole lineup pairs (games 4p-3..4p: both lineups on both sides); --partial allows less.
@@ -75,12 +76,14 @@ else if (cmd === "status") status(pos[1] || newest());
 else if (cmd === "report") report(pos[1] || newest());
 else if (cmd === "compare") compare(pos[1], pos[2]);
 else if (cmd === "stop") stop(pos[1]);
+else if (cmd === "ledger") ledger(pos[1]);
 else
     fail(
         "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03]] [--partial] [--name=]\n" +
             "       npm run batch -- status|report [<name>]\n" +
             "       npm run batch -- compare <name> <baseline>\n" +
-            "       npm run batch -- stop <name>"
+            "       npm run batch -- stop <name>\n" +
+            "       npm run batch -- ledger [<filter>]"
     );
 
 function parseGames(s) {
@@ -329,6 +332,26 @@ function report(name) {
     if (kind === "data") console.log("Verdict: none (data batch: exploration adds noise; use an eval batch to judge a change).");
     else if (played < total) console.log(`Verdict: none yet (${played} of ${total} games; decide on the complete batch only).`);
     else console.log(`Verdict against 50%: ${lo > 0.5 ? "BETTER" : hi < 0.5 ? "WORSE" : "inconclusive"}${m.flags === "none" ? " (A/A batch: should be inconclusive)" : ""}.`);
+}
+
+// Every batch at a glance, oldest first (by start time). <filter> keeps names containing it.
+function ledger(filter) {
+    const names = fs
+        .readdirSync(runsDir)
+        .filter(n => fs.existsSync(path.join(runsDir, n, "manifest.json")) && (!filter || n.includes(filter)))
+        .map(n => [n, JSON.parse(fs.readFileSync(path.join(runsDir, n, "manifest.json"), "utf8"))])
+        .sort((a, b) => String(a[1].started).localeCompare(String(b[1].started)));
+    console.log("started UTC  batch                     kind  flags                         commit        games   won    win%   gold@30");
+    for (const [n] of names) {
+        const r = results(n);
+        const leads = r.rows.filter(x => x.state === "done" && x.lead30 !== null).map(x => x.lead30);
+        const gold = leads.length ? k1(leads.reduce((a, x) => a + x, 0) / leads.length) + (leads.length < r.played ? ` (${leads.length} games with POS lines)` : "") : "-";
+        const started = String(r.m.started || "").slice(5, 16).replace("T", " ");
+        console.log(
+            `${started.padEnd(13)}${n.padEnd(26)}${r.kind.padEnd(6)}${String(r.m.flags).padEnd(30)}${String(r.m.commit || "?").padEnd(14)}` +
+                `${`${r.played}/${r.total}`.padEnd(8)}${String(r.won).padEnd(7)}${(r.played ? pct(r.won / r.played) : "-").padEnd(7)}${gold}`
+        );
+    }
 }
 
 function meanCI(xs) {
