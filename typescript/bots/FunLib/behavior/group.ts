@@ -482,7 +482,10 @@ function Anchor(): Unit | null {
 
 function UpdateRegroup(now: number): void {
     if (EnemyGroupSize() >= ENEMY_GROUP) groupSeenAt = now;
-    const want = !laning && now - groupSeenAt <= GROUP_MEMORY;
+    // Behaviour flag `noregroup`: no regroup (walking to the rally point with farm capped at LOW). From 15:00 to
+    // 35:00 in ev-group2 / ev-group3 regroup held about 261 s per game; the new team farmed 20-21% of the time
+    // against plain OHA's 28%, gained 2.4-3k less net worth and died 19-20 times against 16.
+    const want = !laning && now - groupSeenAt <= GROUP_MEMORY && !IsOn("noregroup");
     if (!want) {
         if (regrouping) Log("regroup end");
         regrouping = false;

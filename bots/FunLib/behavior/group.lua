@@ -953,7 +953,7 @@ local function UpdateRegroup(now)
     if EnemyGroupSize() >= ENEMY_GROUP then
         groupSeenAt = now
     end
-    local want = not laning and now - groupSeenAt <= GROUP_MEMORY
+    local want = not laning and now - groupSeenAt <= GROUP_MEMORY and not IsOn("noregroup")
     if not want then
         if regrouping then
             Log("regroup end")
