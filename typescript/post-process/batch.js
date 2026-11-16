@@ -7,6 +7,9 @@
 //   npm run batch -- compare <a> <b>       win rate of batch a against batch b (b is the baseline; b1+b2 pools baselines)
 //   npm run batch -- stop <name>           stop a batch: its queue, its games, its port locks
 //   npm run batch -- ledger [<filter>]     one line per batch: kind, flags, commit, games, wins, gold lead at 30:00
+//   npm run batch -- smoke <flags> [--game=1] [--until=25] [--expect=<re>]... [--forbid=<re>]...
+//                                          one game to try a change; {new} / {old} in a regex = that team's number
+//   npm run batch -- smokecheck <name> [--keep]   judge it: exit 2 not ready, 0 pass, 1 fail; stops the game when ready
 //
 // <games> are measurement game numbers as in `npm run match` (lineup pair and side rotation), e.g. 1-8 or 1,2,5.
 // Games come in whole lineup pairs (games 4p-3..4p: both lineups on both sides); --partial allows less.
@@ -50,7 +53,8 @@ const opts = {};
 const pos = [];
 for (const a of process.argv.slice(2)) {
     const m = a.match(/^--([a-z]+)(?:=(.*))?$/);
-    if (m) opts[m[1]] = m[2] === undefined ? true : m[2];
+    if (m && (m[1] === "expect" || m[1] === "forbid")) (opts[m[1]] = opts[m[1]] || []).push(m[2] || "");
+    else if (m) opts[m[1]] = m[2] === undefined ? true : m[2];
     else pos.push(a);
 }
 const distro = opts.distro || "Ubuntu";
@@ -77,14 +81,91 @@ else if (cmd === "report") report(pos[1] || newest());
 else if (cmd === "compare") compare(pos[1], pos[2]);
 else if (cmd === "stop") stop(pos[1]);
 else if (cmd === "ledger") ledger(pos[1]);
+else if (cmd === "smoke") smoke(pos[1]);
+else if (cmd === "smokecheck") smokecheck(pos[1]);
 else
     fail(
         "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03]] [--partial] [--name=]\n" +
             "       npm run batch -- status|report [<name>]\n" +
-            "       npm run batch -- compare <name> <baseline>\n" +
+            "       npm run batch -- compare <name> <baseline>[+<baseline>...]\n" +
             "       npm run batch -- stop <name>\n" +
-            "       npm run batch -- ledger [<filter>]"
+            "       npm run batch -- ledger [<filter>]\n" +
+            "       npm run batch -- smoke <flags> [--game=1] [--until=25] [--expect=<re>]... [--forbid=<re>]...\n" +
+            "       npm run batch -- smokecheck <name> [--keep]"
     );
+
+// Smoke game: one game of <flags>, with what must (--expect) and must not (--forbid) appear in its log.
+// Regexes are JavaScript; {new} and {old} stand for the new and old team's number (2 Radiant, 3 Dire).
+// Replaces the hand-written check scripts of 2026-11-16, whose watchers broke on shell quoting.
+function smoke(flags) {
+    if (!flags) fail("Usage: npm run batch -- smoke <flags> [--game=1] [--until=25] [--expect=<re>]... [--forbid=<re>]...");
+    const game = String(opts.game || "1");
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(4, 13).replace("T", "");
+    const name = opts.name || `smoke-${flags.replace(/,/g, "-")}-${stamp}`;
+    for (const re of [...(opts.expect || []), ...(opts.forbid || [])]) new RegExp(re.replace(/\{(new|old)\}/g, "2")); // a bad regex fails here
+    pos.splice(0, pos.length, "start", game, flags);
+    Object.assign(opts, { partial: true, parallel: "1", name });
+    start();
+    const file = path.join(runsDir, name, "manifest.json");
+    const m = JSON.parse(fs.readFileSync(file, "utf8"));
+    m.smoke = { game, until: Number(opts.until || 25), expect: opts.expect || [], forbid: opts.forbid || [] };
+    fs.writeFileSync(file, JSON.stringify(m, null, 2) + "\n");
+    console.log(`Smoke ${name}: npm run batch -- smokecheck ${name}  (exit 2 until ${m.smoke.until}:00 game time or the end)`);
+}
+
+function smokecheck(name) {
+    if (!name) fail("Usage: npm run batch -- smokecheck <name> [--keep]");
+    const dir = path.join(runsDir, name);
+    const m = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
+    const sm = m.smoke || { game: Object.keys(m.games)[0], until: 25, expect: [], forbid: [] };
+    for (const k of ["expect", "forbid"]) if (opts[k]) sm[k] = opts[k]; // override or add checks after the start
+    if (opts.until) sm.until = Number(opts.until);
+    const nt = m.games[sm.game].newTeam === "radiant" ? "2" : "3";
+    const re = s => new RegExp(s.replace(/\{new\}/g, nt).replace(/\{old\}/g, nt === "2" ? "3" : "2"));
+    const local = path.join(dir, `console.g${sm.game}.log`);
+    let text = "";
+    if (fs.existsSync(local)) text = fs.readFileSync(local, "utf8");
+    else {
+        fs.writeFileSync(path.join(dir, "smokelog.sh"), `cat /opt/oha-runs/${name}/g${sm.game}/run/console.log 2>/dev/null\n`);
+        const r = spawnSync("wsl.exe", ["-d", distro, "--cd", dir, "--", "bash", "smokelog.sh"], { encoding: "utf8", maxBuffer: 1 << 30 });
+        text = (r.stdout || "").replace(/\0/g, "");
+    }
+    if (!text) {
+        console.log(`${name}: no console log yet`);
+        process.exit(2);
+    }
+    const lines = text.split("\n");
+    let t = 0;
+    for (let i = lines.length - 1; i >= 0 && !t; i--) {
+        const mm = lines[i].match(/\] POS team=\d hero=\S+ t=([\d.]+)/);
+        if (mm) t = Number(mm[1]);
+    }
+    const ended = text.includes("MATCHREC {");
+    const behavior = lines.filter(l => l.includes("BEHAVIOR_ERROR")).length;
+    const runtime = lines.filter(l => l.includes("Script Runtime Error"));
+    const other = runtime.filter(l => !l.includes("error in error handling"));
+    console.log(`${name} (flags ${m.flags}, new team = team ${nt}): game time ${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}${ended ? ", ended" : ""}`);
+    console.log(`  BEHAVIOR_ERROR ${behavior}, other runtime errors ${other.length}, 'error in error handling' ${runtime.length - other.length} (about 20 in every game, plain OHA too)`);
+    for (const l of other.slice(0, 3)) console.log(`    ${l.slice(0, 200)}`);
+    let ok = behavior === 0 && other.length === 0;
+    for (const s of sm.expect) {
+        const n = lines.filter(l => re(s).test(l)).length;
+        if (n === 0) ok = false;
+        console.log(`  expect /${s}/: ${n}${n === 0 ? "  <- missing" : ""}`);
+    }
+    for (const s of sm.forbid) {
+        const n = lines.filter(l => re(s).test(l)).length;
+        if (n > 0) ok = false;
+        console.log(`  forbid /${s}/: ${n}${n > 0 ? "  <- present" : ""}`);
+    }
+    if (!ended && t < sm.until * 60) {
+        console.log(`  not ready: waiting for ${sm.until}:00`);
+        process.exit(2);
+    }
+    console.log(`Smoke verdict: ${ok ? "PASS" : "FAIL"}`);
+    if (!ended && opts.keep !== true) stop(name);
+    process.exit(ok ? 0 : 1);
+}
 
 function parseGames(s) {
     const out = [];

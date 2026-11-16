@@ -9,11 +9,14 @@ The **new team** is the flagged team, the **old team** plays plain OHA. Each gam
 1. **Diagnose.** Run `npm run diagnose -- <latest complete batches>`. Pick a target that moves the **gold lead** or wins: a mode share, a gold-per-minute gap, a phase where the lead turns. A target that only moves deaths is not enough: `bail`, `yield` and `siegecut` each moved their own death count and gained nothing.
 2. **Write it behind a flag.** Add the name to `FLAGS` in `typescript/post-process/match-setup.js` and to `FlagName` in `typescript/bots/FunLib/behavior/flags.ts`, and read it with `IsOn("name")`. Hero-level code needs a flag too: without one both teams get the change and the test cannot see it.
 3. **Check.** `npm run build` (when TypeScript changed), then `npm run check`: Lua syntax, raw `require("bots.x")` paths, post-process JS, flag names. Both run in seconds; never use a game as a syntax check.
-4. **Smoke.** One game: `npm run batch -- start 1 <base>,<flag> --partial --parallel=1 --name=smoke-<flag>`. Read its console log (`/opt/oha-runs/smoke-<flag>/g1/run/console.log` in WSL) at about 25:00 game time:
-   - errors: `BEHAVIOR_ERROR` must be 0. About 20 `Script Runtime Error: error in error handling` lines appear in every game, plain OHA included: they are not yours.
-   - the change fires for team 2 only (in game 1 the new team is Radiant): look for its own log line or the trace lines below.
+4. **Smoke.** One game, with what the log must and must not show (JavaScript regexes; `{new}` and `{old}` stand for each team's number):
 
-   Then `npm run batch -- stop smoke-<flag>` before starting any batch. Commit the flag.
+   ```
+   npm run batch -- smoke group,noregroup --until=25 --expect="GROUP team={new} t=\d+ (defend|push)" --forbid="GROUP team={new} t=\d+ regroup"
+   npm run batch -- smokecheck <name printed by smoke>
+   ```
+
+   `smokecheck` exits 2 until the game reaches `--until` minutes, then prints PASS (exit 0) or FAIL (exit 1) and stops the game, so a wait is `until npm run -s batch -- smokecheck <name>; [ $? -ne 2 ]; do sleep 60; done`. It fails on any `BEHAVIOR_ERROR` or runtime error other than the ~20 `error in error handling` lines every game prints (plain OHA too), on a missing `--expect` and on a present `--forbid`. Commit the flag after a PASS.
 5. **Eval batch.** `npm run batch -- start 1-32 <base>,<flag> --parallel=5 --name=ev-<base>-<flag>`, explore 0 (the default). Baseline: reuse the existing batches of `<base>` when the base's code has not changed since they ran (code added behind other, off flags does not count; check the `commit` column of `npm run batch -- ledger`). Otherwise start a fresh baseline at the same time with the same games.
 6. **Judge** on complete batches only: `npm run batch -- compare ev-<base>-<flag> <baseline>[+<baseline>...]`.
    - **Gold verdict** first: the paired lead at 30:00, game by game. FAIL drops the flag.

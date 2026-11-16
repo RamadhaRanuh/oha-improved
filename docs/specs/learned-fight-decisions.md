@@ -68,7 +68,7 @@ Also measure the highest timescale that still holds a steady tick rate.
   - Run `game/bin/linuxsteamrt64/dota2` directly. `dota.sh` stops with a FATAL error because it needs the Steam "sniper" runtime.
   - Set `LD_LIBRARY_PATH=bin/linuxsteamrt64` and `ENABLE_PATHMATCH=1`.
   - Copy `/opt/steamcmd/linux64/steamclient.so` to `/root/.steam/sdk64/`. Without it, Steamworks init fails with a FATAL error.
-- **Script:** `headless_full.sh <run> <timescale> [port]` (kept in `C:\Users\Public`, copied to `/opt/oha-runs`).
+- **Script:** `typescript/post-process/headless/game.sh <run dir> <timescale> <port>`, run by `npm run batch` (it replaced the first hand-run `headless_full.sh`).
   - It feeds console commands through a fifo.
   - When the pick phase starts, it loads `bots/tools/match_recorder`.
   - It stops the server after the `MATCHREC` line.
