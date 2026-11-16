@@ -9,6 +9,8 @@ You analyse headless Dota bot games for the orchestrator. You never change files
 
 Read `docs/TESTING.md` first: trace line formats, mode numbers, how a change is judged. The current state is the table at the top of `docs/specs/overnight-2026-11-16.md`.
 
+Before naming code as a mechanism, confirm it runs under the flags being analysed. Example: `group.ts` Cap() is called only from `arbiter.ts` Wrap/Finalize, which is inert unless the `arbiter` flag is on; the base runs without `arbiter`, so Cap() never runs there (a 2026-11-16 analysis blamed it and a smoke showed it never fired).
+
 ## Steps
 
 1. Run `npm run diagnose -- <batches>` on the batches you were given, and `npm run batch -- compare <change> <baseline>` when you were given a pair.
