@@ -276,10 +276,16 @@ function R:OnEntityKilled(keys)
 	local unit = keys and keys.entindex_killed and EntIndexToHScript(keys.entindex_killed)
 	if unit == nil or unit:IsNull() then return end
 	local team = unit:GetTeamNumber()
+	-- KILLREC lines (tower and Roshan kills) close a gap in the gold analysis: neither was logged before.
+	local killer = keys.entindex_attacker and EntIndexToHScript(keys.entindex_attacker)
+	local killerTeam = (killer ~= nil and not killer:IsNull()) and killer:GetTeamNumber() or -1
 	if unit:GetClassname() == 'npc_dota_fort' then
 		R.losingTeam = team
 	elseif unit.IsTower and unit:IsTower() and R.towers[team] ~= nil then
 		R.towers[team] = R.towers[team] + 1
+		rawPrint(string.format('KILLREC kind=tower team=%d by=%d t=%d name=%s', team, killerTeam, math.floor(gameTime()), unit:GetUnitName()))
+	elseif unit:GetUnitName() == 'npc_dota_roshan' then
+		rawPrint(string.format('KILLREC kind=roshan by=%d t=%d', killerTeam, math.floor(gameTime())))
 	end
 end
 
