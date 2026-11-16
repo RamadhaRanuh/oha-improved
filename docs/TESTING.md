@@ -28,6 +28,7 @@ The **new team** is the flagged team, the **old team** plays plain OHA. Each gam
    **Screen first** (faster): add `--screen` and every game stops at 31:00 game time, about half the real time of a full game. `compare` then gives the Gold verdict only, and a full baseline still pairs with it. Run the full eval batch only for a Gold PASS, to confirm on wins.
 6. **Judge** on complete batches only: `npm run batch -- compare ev-<base>-<flag> <baseline>[+<baseline>...]`.
    - **Gold verdict** first: the paired lead at 30:00, game by game. FAIL drops the flag.
+     Judge against at least two pooled baselines of the base (`<screen>+<full>`): the same `group,fixes` code gave +0.1k (ev-gf) and -2.3k (sc-group-fixes) at 30:00, so one baseline can fake a +2k effect. A game counts for gold once its log passed 30:00, even if its server died later. `compare` also prints the paired lead at 10:00 (information only) for changes that act in the laning phase.
    - PASS: confirm on wins. Keep on a win verdict of BETTER, or on Gold PASS with a win difference that is not negative while more games accumulate.
    - Inconclusive on both: drop it, or add games when the mechanism check showed a real effect.
 7. **Close the round.** Kept: the base becomes `<base>,<flag>`. Dropped: remove its code (it is noise in the files that matter), with its result in the commit message. Log the round in the overnight doc; `npm run batch -- ledger` lists every batch.

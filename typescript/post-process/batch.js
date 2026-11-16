@@ -301,9 +301,11 @@ function readRec(file) {
     // Team net worth at 30:00 (POS trace lines, Utils.DebugMode), or at the last sample if the game ended sooner.
     const nw = { 2: {}, 3: {} };
     let nw30 = null;
+    let nw10 = null;
     let reached30 = false;
     for (const m of text.matchAll(/\] POS team=(\d) hero=(\S+) t=([\d.-]+) .* nw=(\d+)/g)) {
         nw[m[1]][m[2]] = Number(m[4]);
+        if (nw10 === null && Number(m[3]) >= 10 * 60) nw10 = Sums(nw);
         if (Number(m[3]) >= 30 * 60) {
             nw30 = Sums(nw);
             reached30 = true;
@@ -311,7 +313,7 @@ function readRec(file) {
         }
     }
     if (nw30 === null && Object.keys(nw[2]).length) nw30 = Sums(nw);
-    return { rec, errors, decisions, d10, nw30, reached30 };
+    return { rec, errors, decisions, d10, nw30, nw10, reached30 };
 }
 function Sums(nw) {
     const s = t => Object.values(nw[t]).reduce((a, v) => a + v, 0);
@@ -368,13 +370,15 @@ function results(name) {
         const r = readRec(file);
         const nt = info.newTeam === "radiant" ? 2 : 3;
         const lead30 = r.nw30 ? r.nw30[nt] - r.nw30[5 - nt] : null;
+        const lead10 = r.nw10 ? r.nw10[nt] - r.nw10[5 - nt] : null;
         // A screen game is stopped at 31:00 without a MATCHREC; it counts once its log reached 30:00.
         const ok = r.rec || (m.screen && r.reached30);
-        rows.push({ g, info, state: ok ? "done" : "no MATCHREC", ...r, lead30 });
+        rows.push({ g, info, state: ok ? "done" : "no MATCHREC", ...r, lead30, lead10 });
     }
     const done = rows.filter(r => r.state === "done");
     const won = done.filter(r => r.rec && r.rec.winner === r.info.newTeam).length;
-    return { m, rows, played: done.length, won, total: rows.length, kind: m.kind || (m.explore > 0 ? "data" : "eval"), screen: !!m.screen };
+    for (const r of rows) r.gold = r.state === "done" || !!r.reached30;
+    return { m, rows, played: done.length, goldPlayed: rows.filter(r => r.gold).length, won, total: rows.length, kind: m.kind || (m.explore > 0 ? "data" : "eval"), screen: !!m.screen };
 }
 
 function report(name) {
@@ -474,15 +478,24 @@ function k1(x) {
 // Gold screen: the new team's net-worth lead at 30:00, paired game by game (same lineup, same side), so the
 // lineup's own effect cancels. Much less noisy per game than a win; it screens a change, wins confirm it.
 function goldScreen(a, b, A, Bb) {
-    const byG = x => Object.fromEntries(x.rows.filter(r => r.state === "done" && r.lead30 !== null).map(r => [r.g, r.lead30]));
+    // A game counts for gold once its log passed 30:00, even if its server died before the end (ev-gf g24).
+    const byG = x => Object.fromEntries(x.rows.filter(r => r.gold && r.lead30 !== null).map(r => [r.g, r.lead30]));
     const ga = byG(A), gb = byG(Bb);
     const diffs = Object.keys(ga).filter(g => g in gb).map(g => ga[g] - gb[g]);
     if (diffs.length < 2) return;
     const [mean, lo, hi] = meanCI(diffs);
     console.log(`Gold screen, lead at 30:00 ${a} - ${b}, paired over ${diffs.length} games: ${k1(mean)}, 95% range ${k1(lo)} to ${k1(hi)}.`);
-    const complete = A.played === A.total && Bb.played === Bb.total;
+    const complete = A.goldPlayed === A.total && Bb.goldPlayed === Bb.total;
     if (!complete) console.log("Gold verdict: none yet (both batches must be complete).");
     else console.log(`Gold verdict: ${lo > 0 ? "PASS (confirm on wins)" : hi < 0 ? "FAIL" : "inconclusive"}.`);
+    // The lead at 10:00 is for changes that act in the laning phase; no verdict (10:00 is not the target).
+    const by10 = x => Object.fromEntries(x.rows.filter(r => r.gold && r.lead10 != null).map(r => [r.g, r.lead10]));
+    const ta = by10(A), tb = by10(Bb);
+    const d10 = Object.keys(ta).filter(g => g in tb).map(g => ta[g] - tb[g]);
+    if (d10.length >= 2) {
+        const [m10, l10, h10] = meanCI(d10);
+        console.log(`Gold lead at 10:00 (information only), paired over ${d10.length} games: ${k1(m10)}, 95% range ${k1(l10)} to ${k1(h10)}.`);
+    }
 }
 
 // Several baselines joined with "+" pool into one: wins add up, and each game's gold lead is the mean over the
@@ -496,22 +509,25 @@ function pooled(spec) {
     const flags = new Set(parts.map(p => p.m.flags));
     if (flags.size > 1) fail(`Pooled baselines must share their flags; got ${[...flags].join(" / ")}`);
     const byGame = {};
+    const by10 = {};
     const winBy = {};
     for (const p of parts)
         for (const r of p.rows) {
-            if (r.state !== "done") continue;
+            if (!r.gold) continue;
             if (r.lead30 !== null) (byGame[r.g] = byGame[r.g] || []).push(r.lead30);
-            if (r.rec) (winBy[r.g] = winBy[r.g] || []).push(r.rec.winner === r.info.newTeam ? 1 : 0);
+            if (r.lead10 != null) (by10[r.g] = by10[r.g] || []).push(r.lead10);
+            if (r.state === "done" && r.rec) (winBy[r.g] = winBy[r.g] || []).push(r.rec.winner === r.info.newTeam ? 1 : 0);
         }
     const mean = v => v.reduce((x, y) => x + y, 0) / v.length;
     const gs = new Set([...Object.keys(byGame), ...Object.keys(winBy)]);
-    const rows = [...gs].map(g => ({ g: Number(g), state: "done", lead30: byGame[g] ? mean(byGame[g]) : null, winRate: winBy[g] ? mean(winBy[g]) : null }));
+    const rows = [...gs].map(g => ({ g: Number(g), state: "done", gold: true, lead30: byGame[g] ? mean(byGame[g]) : null, lead10: by10[g] ? mean(by10[g]) : null, winRate: winBy[g] ? mean(winBy[g]) : null }));
     const games = {};
     for (const p of parts) Object.assign(games, p.m.games);
     return {
         m: { flags: parts[0].m.flags, games, commit: parts.map(p => p.m.commit || "?").join("+") },
         rows,
         played: parts.reduce((x, p) => x + p.played, 0),
+        goldPlayed: parts.reduce((x, p) => x + p.goldPlayed, 0),
         won: parts.reduce((x, p) => x + p.won, 0),
         total: parts.reduce((x, p) => x + p.total, 0),
         kind: parts.some(p => p.kind === "data") ? "data" : "eval",
