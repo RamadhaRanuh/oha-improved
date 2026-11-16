@@ -1,16 +1,16 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
-## Current state (updated 2026-11-16 18:15)
+## Current state (updated 2026-11-16 19:00)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
 | Base | `group`: 50/96 against plain OHA over three complete batches (52%), about even |
-| In test | `noregroup` (`ev-group-noregroup` vs `ev-group4`) |
-| Next | `farmfree`, written, smoke test after `noregroup` is judged |
+| In test | `farmfree` (implementer in ../oha-wt/farmfree; smoke next) |
+| Next | fix the shared-code errors the probe found (item use 2,861 errors/game, farm 155/game), behind a flag: waiting on the user |
 | Kept so far | none beyond the base |
-| Removed after a complete batch | `bail`, `yield`, `siegecut` (code deleted, 53ba259) |
+| Removed after a complete batch | `bail`, `yield`, `siegecut` (53ba259), `noregroup` (d301818) |
 | Parked | `learned` (1 of 6 games) |
 | Where games are lost | 15:00-35:00: the new team farms 21-24% of the time against plain OHA's 29-34% (about 5% less gold per minute per hero), and dies 20-22 times per game after 35:00 against 15-18 |
 
@@ -122,3 +122,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **17:05** Mid-way check on `noregroup` (7 vs 9 games, no verdict): team roam 15:00-35:00 fell to 9% (baseline 12%), but farm stayed at 22% (baseline 24%; plain OHA 29-34%). So regroup is not the whole farm gap. Another `group` farm limit: behavior/alone's `SafeFarm` moves farming off deep enemy camps and drops the lane creeps around the bot whenever 3+ enemies have been unseen 15 s and no ally is near, which in bot games is most of the time. ALONE blocked=farm lines: about 16 per game (logged at most once per 20 s per hero, so a lower bound). Next change written (not committed, after `noregroup` is decided): flag `farmfree`, SafeFarm is skipped (handwritten mode_farm_generic.lua).
 - **18:05** Retro fixes built while `noregroup` runs (tooling only; running batches use their own copies): `npm run check` parses all 318 Lua files in about a second (209c08d); `npm run build` always runs its post-process and fails loudly on a TS error (209c08d); `npm run diagnose -- <batch>` gives the lead over time, 15:00-35:00 mode share, per-hero gpm, deaths by phase and place, and the regroup / ALONE blocks (63316ef); `compare` pools baselines (`a b1+b2`) and each new manifest records its commit (c2b9efd). `siegecut` against `ev-group2+ev-group3`: wins -3 points (-24 to +18), gold +1.6k (-1.1k to +4.3k), still inconclusive. New from `diagnose`: after 35:00 the new team dies 20-22 times per game against plain OHA's 15-18. Written, not yet tested: a 10-game cap through the port pool (27201-27210).
 - **18:15** Clarity work with the user's go-ahead: dropped flags `bail`, `yield`, `siegecut` removed from the code (53ba259; with them off nothing changes); `npm run check` now also checks that flag names agree across `IsOn` calls, `FLAGS` and `FlagName` (f1bc57d); `npm run batch -- ledger` lists every batch (f0e0631); docs/TESTING.md is the runbook for a round (diagnose, check, smoke, eval batch, judge, keep or drop, lost games, trace lines, API traps), pointed to from CLAUDE.md and BEHAVIOR_CHANGES.md; a current-state table heads this doc.
+- **19:00** `noregroup` dropped (gold -1.1k vs ev-group4, +0.2k vs pooled; wins +6 / +8 points; all inconclusive) and removed (d301818). Tooling: `--screen` batches stop at 31:00 (one game: 398 real s, lead read at t=1898) and the 10-port pool (e018068, games ran on 27201/27202); multi-agent setup agreed with the user (af79fe0, TESTING.md "Who does what"). A probe game wrapping every bot entry point in pcall found what hides behind the 20 'error in error handling' lines (the log squelches repeats): ItemUsageThink fails about 2,861 times per game at FunLib/jmz_func.lua:506 (GetEnemiesNearLoc given a bad location), farm Think 155 times at mode_farm_generic.lua:673 (J.Site.IsCampDangerous does not exist), and aba_global_overrides.lua calls debug.traceback with no debug library. Both teams are hit. `farmfree` handed to an implementer, an analyst on the group batches.
