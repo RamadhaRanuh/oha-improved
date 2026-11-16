@@ -174,7 +174,7 @@ function stop(name) {
             `for gp in $(pgrep -f "scripts/game.sh ${B}/"); do`,
             `  port=$(tr '\\0' ' ' < /proc/$gp/cmdline | awk '{print $NF}')`,
             `  pkill -9 -P $gp; kill -9 $gp`,
-            `  rmdir /tmp/oha-ports/$port 2>/dev/null`,
+            `  rm -rf /tmp/oha-ports/$port`,
             `done`,
             `pkill -f "unshare -m bash -c mount --bind '${B}/"`,
             `sleep 1; echo "left: $(pgrep -fc "oha-runs/${name}/")  dota2 running: $(ps -C dota2 -o pid= | wc -l)"`,

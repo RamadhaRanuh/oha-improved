@@ -26,15 +26,26 @@ for g in $(cat "$B/games.txt"); do
   # Claim a free port across every running batch (mkdir is atomic); two servers on one port crash at startup.
   mkdir -p /tmp/oha-ports
   PORT=27201
-  # A lock left by a game that died with WSL (no dota2 server holds the port any more) is taken back.
-  until mkdir "/tmp/oha-ports/$PORT" 2>/dev/null || { [ -z "$(pgrep -f -- "-port $PORT( |$)")" ] && [ -n "$(find "/tmp/oha-ports/$PORT" -maxdepth 0 -mmin +2)" ] && touch "/tmp/oha-ports/$PORT"; }; do PORT=$((PORT + 1)); done
+  # Each lock holds its owner's pid. A lock is taken back only when that owner is dead (a game that died
+  # with WSL, or one whose release raced); a lock without a pid (an older batch, or a claim being set up)
+  # only when no server holds the port and it is 2+ minutes old. rm + mkdir keeps the takeover atomic.
+  claim() {
+    local L="/tmp/oha-ports/$1" o
+    mkdir "$L" 2>/dev/null && return 0
+    o=$(cat "$L/pid" 2>/dev/null)
+    if [ -n "$o" ]; then kill -0 "$o" 2>/dev/null && return 1
+    else { [ -z "$(pgrep -f -- "-port $1( |$)")" ] && [ -n "$(find "$L" -maxdepth 0 -mmin +2)" ]; } || return 1; fi
+    rm -rf "$L" && mkdir "$L" 2>/dev/null
+  }
+  until claim "$PORT"; do PORT=$((PORT + 1)); done
   (
     unshare -m bash -c "mount --bind '$G/bots' '$BOTS' && exec bash '$HERE/game.sh' '$G/run' $TS $PORT" > "$G/result.txt" 2>&1
-    rmdir "/tmp/oha-ports/$PORT"
+    [ "$(cat "/tmp/oha-ports/$PORT/pid" 2>/dev/null)" = "$BASHPID" ] && rm -rf "/tmp/oha-ports/$PORT"   # only our own lock
     cp "$G/run/console.log" "$OUT/console.g$g.log" 2>/dev/null
     rm -rf "$G/bots"
     log "g$g done: $(grep -ao '"winner":"[a-z]*"' "$G/run/console.log" | head -1) $(grep -a 'real seconds' "$G/result.txt")"
   ) &
+  echo $! > "/tmp/oha-ports/$PORT/pid"
   log "g$g started (port $PORT)"
   sleep 3
 done
