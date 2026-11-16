@@ -200,7 +200,22 @@ function readRec(file) {
     // deaths before 10:00 per team (DEATH lines, Utils.DebugMode)
     const d10 = { 2: 0, 3: 0 };
     for (const m of text.matchAll(/DEATH team=(\d) hero=\S+ t=(-?\d+)/g)) if (Number(m[2]) <= 600) d10[m[1]]++;
-    return { rec, errors, decisions, d10 };
+    // Team net worth at 30:00 (POS trace lines, Utils.DebugMode), or at the last sample if the game ended sooner.
+    const nw = { 2: {}, 3: {} };
+    let nw30 = null;
+    for (const m of text.matchAll(/\] POS team=(\d) hero=(\S+) t=([\d.-]+) .* nw=(\d+)/g)) {
+        nw[m[1]][m[2]] = Number(m[4]);
+        if (Number(m[3]) >= 30 * 60) {
+            nw30 = Sums(nw);
+            break;
+        }
+    }
+    if (nw30 === null && Object.keys(nw[2]).length) nw30 = Sums(nw);
+    return { rec, errors, decisions, d10, nw30 };
+}
+function Sums(nw) {
+    const s = t => Object.values(nw[t]).reduce((a, v) => a + v, 0);
+    return { 2: s(2), 3: s(3) };
 }
 
 function status(name) {
@@ -251,7 +266,9 @@ function results(name) {
             continue;
         }
         const r = readRec(file);
-        rows.push({ g, info, state: r.rec ? "done" : "no MATCHREC", ...r });
+        const nt = info.newTeam === "radiant" ? 2 : 3;
+        const lead30 = r.nw30 ? r.nw30[nt] - r.nw30[5 - nt] : null;
+        rows.push({ g, info, state: r.rec ? "done" : "no MATCHREC", ...r, lead30 });
     }
     const done = rows.filter(r => r.state === "done");
     const won = done.filter(r => r.rec.winner === r.info.newTeam).length;
@@ -300,11 +317,41 @@ function report(name) {
     console.log(`New team won ${won} of ${played} finished games.`);
     if (played) console.log(`Average per game: nw10 new-old ${Math.round(sums.nw / played)}, lh10 new-old ${Math.round(sums.lh / played)}, deaths before 10:00 new-old ${(sums.d10 / played).toFixed(1)}`);
     if (!played) return;
+    const leads = rows.filter(r => r.state === "done" && r.lead30 !== null).map(r => r.lead30);
+    if (leads.length > 1) {
+        const [mean, lo30, hi30] = meanCI(leads);
+        console.log(`Gold lead at 30:00 (new - old): ${k1(mean)} per game, 95% range ${k1(lo30)} to ${k1(hi30)} (${leads.length} games).`);
+    }
     const [lo, hi] = wilson(won, played);
     console.log(`Win rate ${pct(won / played)}, 95% range ${pct(lo)}-${pct(hi)}.`);
     if (kind === "data") console.log("Verdict: none (data batch: exploration adds noise; use an eval batch to judge a change).");
     else if (played < total) console.log(`Verdict: none yet (${played} of ${total} games; decide on the complete batch only).`);
     else console.log(`Verdict against 50%: ${lo > 0.5 ? "BETTER" : hi < 0.5 ? "WORSE" : "inconclusive"}${m.flags === "none" ? " (A/A batch: should be inconclusive)" : ""}.`);
+}
+
+function meanCI(xs) {
+    const n = xs.length;
+    const mean = xs.reduce((a, x) => a + x, 0) / n;
+    const sd = Math.sqrt(xs.reduce((a, x) => a + (x - mean) * (x - mean), 0) / (n - 1));
+    const h = (n < 30 ? 2.1 : 1.96) * (sd / Math.sqrt(n));
+    return [mean, mean - h, mean + h];
+}
+function k1(x) {
+    return `${x >= 0 ? "+" : ""}${(x / 1000).toFixed(1)}k`;
+}
+
+// Gold screen: the new team's net-worth lead at 30:00, paired game by game (same lineup, same side), so the
+// lineup's own effect cancels. Much less noisy per game than a win; it screens a change, wins confirm it.
+function goldScreen(a, b, A, Bb) {
+    const byG = x => Object.fromEntries(x.rows.filter(r => r.state === "done" && r.lead30 !== null).map(r => [r.g, r.lead30]));
+    const ga = byG(A), gb = byG(Bb);
+    const diffs = Object.keys(ga).filter(g => g in gb).map(g => ga[g] - gb[g]);
+    if (diffs.length < 2) return;
+    const [mean, lo, hi] = meanCI(diffs);
+    console.log(`Gold screen, lead at 30:00 ${a} - ${b}, paired over ${diffs.length} games: ${k1(mean)}, 95% range ${k1(lo)} to ${k1(hi)}.`);
+    const complete = A.played === A.total && Bb.played === Bb.total;
+    if (!complete) console.log("Gold verdict: none yet (both batches must be complete).");
+    else console.log(`Gold verdict: ${lo > 0 ? "PASS (confirm on wins)" : hi < 0 ? "FAIL" : "inconclusive"}.`);
 }
 
 function compare(a, b) {
@@ -318,6 +365,7 @@ function compare(a, b) {
     const gb = Object.keys(Bb.m.games).sort().join(",");
     if (ga !== gb) console.log("Note: the two batches cover different games (lineups); the difference mixes in lineup effects.");
     if (!A.played || !Bb.played) return;
+    goldScreen(a, b, A, Bb);
     const pa = A.won / A.played;
     const pb = Bb.won / Bb.played;
     const se = Math.sqrt((pa * (1 - pa)) / A.played + (pb * (1 - pb)) / Bb.played);
