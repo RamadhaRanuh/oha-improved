@@ -32,8 +32,9 @@
  * picked for a defence or push whose lane is not theirs and whose point is farther than CORE_NEAR (tier-3
  * and 4+ enemy defences still take every bot), do not walk back to a regroup rally unless it is such a
  * push or defence point in their lane or near them, and team roam's help-ally walk ignores allies farther
- * than CORE_FIGHT_RANGE. All of it is off while an ally within CORE_FIGHT_RANGE is fighting.
- *   COREFARM team=3 hero=juggernaut t=1100 skip=regroup          at most once per CORE_LOG_GAP s per bot
+ * than CORE_FIGHT_RANGE. All of it is off while an ally within CORE_FIGHT_RANGE is fighting. Cap() leaves a
+ * core's farm alone unless it is picked for a defence or is in a push that has gathered.
+ *   COREFARM team=3 hero=juggernaut t=1100 skip=regroup     (gather|regroup|helpally|cap) once per CORE_LOG_GAP s per bot and kind
  */
 import { BotMode, Lane, Tower, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import * as jmz from "bots/FunLib/jmz_func";
@@ -144,7 +145,7 @@ const allyAlive: Record<number, boolean> = {};
 const moving: Record<number, boolean> = {}; // regroup walk in progress (arrival hysteresis)
 const target: Record<number, Vector> = {};
 const lastMove: Record<number, number> = {};
-const coreLogAt: Record<number, number> = {};
+const coreLogAt: Record<string, number> = {};
 
 function Dist(a: Vector, b: Vector): number {
     const dx = a.x - b.x;
@@ -168,10 +169,10 @@ function Log(text: string): void {
 
 function CoreLog(bot: Unit, skip: string): void {
     if (!Utils.DebugMode) return;
-    const id = bot.GetPlayerID();
+    const key = `${bot.GetPlayerID()}:${skip}`;
     const now = DotaTime();
-    if (coreLogAt[id] !== undefined && now - coreLogAt[id] < CORE_LOG_GAP) return;
-    coreLogAt[id] = now;
+    if (coreLogAt[key] !== undefined && now - coreLogAt[key] < CORE_LOG_GAP) return;
+    coreLogAt[key] = now;
     print(`COREFARM team=${GetTeam()} hero=${Short(bot)} t=${Math.floor(now)} skip=${skip}`);
 }
 
@@ -184,9 +185,14 @@ function AllyFightNear(bot: Unit): boolean {
     return false;
 }
 
-/** Flag `corefarm`: a core (pos 1-3) before CORE_FARM_UNTIL with no ally fighting near it keeps farming. */
+/** Flag `corefarm`: a core bot (pos 1-3) before CORE_FARM_UNTIL. */
+function CoreWindow(bot: Unit): boolean {
+    return IsOn("corefarm") && bot.IsBot() && DotaTime() < CORE_FARM_UNTIL && jmz.GetPosition(bot) <= 3;
+}
+
+/** Flag `corefarm`: a core in its window with no ally fighting near it keeps farming instead of walking to the team. */
 function CoreFree(bot: Unit): boolean {
-    return IsOn("corefarm") && bot.IsBot() && DotaTime() < CORE_FARM_UNTIL && jmz.GetPosition(bot) <= 3 && !AllyFightNear(bot);
+    return CoreWindow(bot) && !AllyFightNear(bot);
 }
 
 /** A push or defence target the core may still be pulled to: in its own lane or near it. */
@@ -665,12 +671,6 @@ function FarFromGroup(bot: Unit): boolean {
     } else if (d > REGROUP_RADIUS) {
         moving[id] = true;
     }
-    // Flag corefarm: a core walks back only to a push or defence point in its lane or near it.
-    if (moving[id] === true && CoreFree(bot) && (rallyLane === null || !CoreNear(bot, rallyLane, rally))) {
-        moving[id] = false;
-        CoreLog(bot, "regroup");
-        return false;
-    }
     return moving[id] === true;
 }
 
@@ -679,6 +679,11 @@ export function RegroupDesire(bot: Unit): number {
     Update();
     if (!bot.IsAlive() || !bot.IsBot() || jmz.GetHP(bot) < REGROUP_MIN_HP) return 0;
     if (!FarFromGroup(bot)) return 0;
+    // Flag corefarm: a core walks back only to a push or defence point in its lane or near it.
+    if (CoreFree(bot) && (rallyLane === null || !CoreNear(bot, rallyLane, rally as Vector))) {
+        CoreLog(bot, "regroup");
+        return 0;
+    }
     target[bot.GetPlayerID()] = rally as Vector;
     return DesireTier.HIGH;
 }
@@ -704,8 +709,17 @@ export function Cap(bot: Unit, mode: BotMode, value: number): number {
     Update();
     if (laning) return value;
     const id = bot.GetPlayerID();
-    const busy = DefenceOf(id) !== null || (push !== null && push.ids.includes(id)) || FarFromGroup(bot);
-    return busy ? LOW : value;
+    const defending = DefenceOf(id) !== null;
+    const member = push !== null && push.ids.includes(id);
+    const busy = defending || member || FarFromGroup(bot);
+    if (!busy) return value;
+    // Flag corefarm: a core's farm is capped only by a defence it was picked for (picks already leave far
+    // cores out) or a push of its that has started; a gathering push or being far from the group does not.
+    if (mode === BotMode.Farm && CoreWindow(bot) && !defending && !(member && push!.gathered)) {
+        CoreLog(bot, "cap");
+        return value;
+    }
+    return LOW;
 }
 
 /**

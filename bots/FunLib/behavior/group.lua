@@ -402,12 +402,12 @@ local function CoreLog(bot, skip)
     if not Utils.DebugMode then
         return
     end
-    local id = bot:GetPlayerID()
+    local key = (tostring(bot:GetPlayerID()) .. ":") .. skip
     local now = DotaTime()
-    if coreLogAt[id] ~= nil and now - coreLogAt[id] < CORE_LOG_GAP then
+    if coreLogAt[key] ~= nil and now - coreLogAt[key] < CORE_LOG_GAP then
         return
     end
-    coreLogAt[id] = now
+    coreLogAt[key] = now
     print((((((("COREFARM team=" .. tostring(GetTeam())) .. " hero=") .. Short(bot)) .. " t=") .. tostring(math.floor(now))) .. " skip=") .. skip)
 end
 --- An allied hero within CORE_FIGHT_RANGE of the bot is fighting: hit by a hero just now with an enemy hero close.
@@ -438,9 +438,13 @@ local function AllyFightNear(bot)
     end
     return false
 end
---- Flag `corefarm`: a core (pos 1-3) before CORE_FARM_UNTIL with no ally fighting near it keeps farming.
+--- Flag `corefarm`: a core bot (pos 1-3) before CORE_FARM_UNTIL.
+local function CoreWindow(bot)
+    return IsOn("corefarm") and bot:IsBot() and DotaTime() < CORE_FARM_UNTIL and jmz.GetPosition(bot) <= 3
+end
+--- Flag `corefarm`: a core in its window with no ally fighting near it keeps farming instead of walking to the team.
 local function CoreFree(bot)
-    return IsOn("corefarm") and bot:IsBot() and DotaTime() < CORE_FARM_UNTIL and jmz.GetPosition(bot) <= 3 and not AllyFightNear(bot)
+    return CoreWindow(bot) and not AllyFightNear(bot)
 end
 --- A push or defence target the core may still be pulled to: in its own lane or near it.
 local function CoreNear(bot, lane, point)
@@ -565,10 +569,10 @@ local function EnemyGroupSize()
         local i = 0
         while i < #pts do
             do
-                local __continue54
+                local __continue55
                 repeat
                     if used[i + 1] then
-                        __continue54 = true
+                        __continue55 = true
                         break
                     end
                     used[i + 1] = true
@@ -590,9 +594,9 @@ local function EnemyGroupSize()
                         end
                     end
                     best = math.max(best, #group)
-                    __continue54 = true
+                    __continue55 = true
                 until true
-                if not __continue54 then
+                if not __continue55 then
                     break
                 end
             end
@@ -643,11 +647,11 @@ local function UpdateDefences(now)
     local threats = {}
     for ____, lane in ipairs(LANES) do
         do
-            local __continue71
+            local __continue72
             repeat
                 local low = LowestTower(team, lane)
                 if low == nil then
-                    __continue71 = true
+                    __continue72 = true
                     break
                 end
                 local n = 0
@@ -663,20 +667,20 @@ local function UpdateDefences(now)
                 if n > 0 and (running or n >= 2 or TowerHit(low[1])) then
                     threats[#threats + 1] = {lane, n, low[1], low[2]}
                 end
-                __continue71 = true
+                __continue72 = true
             until true
-            if not __continue71 then
+            if not __continue72 then
                 break
             end
         end
     end
     for ____, lane in ipairs(LANES) do
         do
-            local __continue78
+            local __continue79
             repeat
                 local d = defences[lane]
                 if d == nil then
-                    __continue78 = true
+                    __continue79 = true
                     break
                 end
                 local live = __TS__ArraySome(
@@ -690,9 +694,9 @@ local function UpdateDefences(now)
                     Log((((("defend lane=" .. LANE_NAMES[lane]) .. " end dur=") .. tostring(math.floor(now - d.since))) .. " gathered=") .. tostring(d.gathered))
                     __TS__Delete(defences, lane)
                 end
-                __continue78 = true
+                __continue79 = true
             until true
-            if not __continue78 then
+            if not __continue79 then
                 break
             end
         end
@@ -708,7 +712,7 @@ local function UpdateDefences(now)
     local taken = {}
     for ____, t in ipairs(threats) do
         do
-            local __continue86
+            local __continue87
             repeat
                 local lane, enemies, tower, tier = unpack(t)
                 local all = tier >= 3 or enemies >= 4
@@ -758,7 +762,7 @@ local function UpdateDefences(now)
                         Log((("defend lane=" .. LANE_NAMES[lane]) .. " end why=nobody dur=") .. tostring(math.floor(now - old.since)))
                         __TS__Delete(defences, lane)
                     end
-                    __continue86 = true
+                    __continue87 = true
                     break
                 end
                 if old == nil then
@@ -785,20 +789,20 @@ local function UpdateDefences(now)
                     old.enemies = enemies
                     old.tier = tier
                 end
-                __continue86 = true
+                __continue87 = true
             until true
-            if not __continue86 then
+            if not __continue87 then
                 break
             end
         end
     end
     for ____, lane in ipairs(LANES) do
         do
-            local __continue104
+            local __continue105
             repeat
                 local d = defences[lane]
                 if d == nil or d.gathered then
-                    __continue104 = true
+                    __continue105 = true
                     break
                 end
                 local here = 0
@@ -818,9 +822,9 @@ local function UpdateDefences(now)
                     d.gathered = true
                     Log((((("defend lane=" .. LANE_NAMES[lane]) .. " gathered here=") .. tostring(here)) .. "/") .. tostring(#d.ids))
                 end
-                __continue104 = true
+                __continue105 = true
             until true
-            if not __continue104 then
+            if not __continue105 then
                 break
             end
         end
@@ -836,15 +840,15 @@ local function PickPushLane()
     local bestScore = 1000000000
     for ____, lane in ipairs(LANES) do
         do
-            local __continue113
+            local __continue114
             repeat
                 if Siege.LaneAtHighGround(lane) then
-                    __continue113 = true
+                    __continue114 = true
                     break
                 end
                 local low = LowestTower(enemy, lane)
                 if low == nil then
-                    __continue113 = true
+                    __continue114 = true
                     break
                 end
                 local score = Dist(
@@ -865,9 +869,9 @@ local function PickPushLane()
                     bestScore = score
                     best = lane
                 end
-                __continue113 = true
+                __continue114 = true
             until true
-            if not __continue113 then
+            if not __continue114 then
                 break
             end
         end
@@ -1172,11 +1176,6 @@ local function FarFromGroup(bot)
     elseif d > REGROUP_RADIUS then
         moving[id] = true
     end
-    if moving[id] == true and CoreFree(bot) and (rallyLane == nil or not CoreNear(bot, rallyLane, rally)) then
-        moving[id] = false
-        CoreLog(bot, "regroup")
-        return false
-    end
     return moving[id] == true
 end
 --- Team roam: walk to the rally point. HIGH while far from it (hysteresis: REGROUP_RADIUS out, REGROUP_ARRIVE in), else 0.
@@ -1186,6 +1185,10 @@ function ____exports.RegroupDesire(bot)
         return 0
     end
     if not FarFromGroup(bot) then
+        return 0
+    end
+    if CoreFree(bot) and (rallyLane == nil or not CoreNear(bot, rallyLane, rally)) then
+        CoreLog(bot, "regroup")
         return 0
     end
     target[bot:GetPlayerID()] = rally
@@ -1220,8 +1223,17 @@ function ____exports.Cap(bot, mode, value)
         return value
     end
     local id = bot:GetPlayerID()
-    local busy = DefenceOf(id) ~= nil or push ~= nil and __TS__ArrayIncludes(push.ids, id) or FarFromGroup(bot)
-    return busy and LOW or value
+    local defending = DefenceOf(id) ~= nil
+    local member = push ~= nil and __TS__ArrayIncludes(push.ids, id)
+    local busy = defending or member or FarFromGroup(bot)
+    if not busy then
+        return value
+    end
+    if mode == BotMode.Farm and CoreWindow(bot) and not defending and not (member and push.gathered) then
+        CoreLog(bot, "cap")
+        return value
+    end
+    return LOW
 end
 --- Flag `corefarm`, for team roam's help-ally walk: a free core ignores a fight farther than
 -- CORE_FIGHT_RANGE (a fight inside that range already makes it not free, see AllyFightNear).
