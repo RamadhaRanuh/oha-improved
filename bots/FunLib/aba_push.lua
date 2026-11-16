@@ -169,7 +169,7 @@ function ____exports.GetPushDesireHelper(bot, lane)
             if IsOn("fight") and Fight.FightOf(bot) ~= nil then
                 return SIEGE_FIGHT_YIELD
             end
-            if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP then
+            if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP and not Group.Bails(bot) then
                 return Siege.COMMIT_DESIRE
             end
         end
@@ -181,7 +181,7 @@ function ____exports.GetPushDesireHelper(bot, lane)
             if IsOn("fight") and Fight.FightOf(bot) ~= nil then
                 return SIEGE_FIGHT_YIELD
             end
-            if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP then
+            if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP and not Group.Bails(bot) then
                 return Group.PUSH_DESIRE
             end
         end

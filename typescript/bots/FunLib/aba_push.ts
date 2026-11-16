@@ -308,14 +308,14 @@ export function GetPushDesireHelper(bot: Unit, lane: Lane): BotModeDesire {
             // The flat commit desire (+ the running-mode bonus, 0.97) beat both: 9089765175 Axe and Puck stayed
             // in push mode on Dire's high ground from 85% to 40% health while retreat asked 0.85 (deaths 51:49).
             if (IsOn("fight") && Fight.FightOf(bot) !== null) return SIEGE_FIGHT_YIELD as BotModeDesire;
-            if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP) return Siege.COMMIT_DESIRE as BotModeDesire;
+            if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP && !Group.Bails(bot)) return Siege.COMMIT_DESIRE as BotModeDesire;
         }
         // Team push below high ground (behavior/group): members push the chosen lane once they met.
         const role = Group.PushRoleOf(bot, lane);
         if (role === "skip" || role === "gather") return BotModeDesire.VeryLow;
         if (role === "push") {
             if (IsOn("fight") && Fight.FightOf(bot) !== null) return SIEGE_FIGHT_YIELD as BotModeDesire;
-            if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP) return Group.PUSH_DESIRE as BotModeDesire;
+            if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP && !Group.Bails(bot)) return Group.PUSH_DESIRE as BotModeDesire;
         }
     }
 

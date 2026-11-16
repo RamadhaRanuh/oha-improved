@@ -34,6 +34,7 @@ import * as Utils from "bots/FunLib/utils";
 import * as Brain from "./team_brain";
 import * as Siege from "./siege";
 import { DesireTier } from "./desire_tiers";
+import { IsOn } from "./flags";
 
 const UPDATE = 1;
 // ---- defence (tunable)
@@ -571,7 +572,7 @@ export function NoPush(): boolean {
 /** Team roam: walk to a defence or push gather point. HIGH while walking there, else 0. */
 export function GatherDesire(bot: Unit): number {
     Update();
-    if (!bot.IsAlive() || !bot.IsBot()) return 0;
+    if (!bot.IsAlive() || !bot.IsBot() || Bails(bot)) return 0;
     const id = bot.GetPlayerID();
     const d = DefenceOf(id);
     if (d !== null && !d.gathered) {
@@ -600,10 +601,22 @@ function FarFromGroup(bot: Unit): boolean {
     return moving[id] === true;
 }
 
+/**
+ * Behaviour flag `bail`: below BAIL_HP a bot drops every group role (push, siege commit, defence,
+ * regroup, gather) so retreat can win. In the `group` batches the new team died 11.6 times per game
+ * after 20:00 having started its retreat below 40% health (plain OHA 7.5): push and siege bid 0.75-0.85
+ * down to 35% health, defence at least HIGH at any health, regroup and gather HIGH down to 40% or 0%,
+ * while retreat was already asking 0.5 or more.
+ */
+export const BAIL_HP = 0.55;
+export function Bails(bot: Unit): boolean {
+    return IsOn("bail") && jmz.GetHP(bot) < BAIL_HP;
+}
+
 /** Team roam: walk to the rally point. HIGH while far from it (hysteresis: REGROUP_RADIUS out, REGROUP_ARRIVE in), else 0. */
 export function RegroupDesire(bot: Unit): number {
     Update();
-    if (!bot.IsAlive() || !bot.IsBot() || jmz.GetHP(bot) < REGROUP_MIN_HP) return 0;
+    if (!bot.IsAlive() || !bot.IsBot() || jmz.GetHP(bot) < REGROUP_MIN_HP || Bails(bot)) return 0;
     if (!FarFromGroup(bot)) return 0;
     target[bot.GetPlayerID()] = rally as Vector;
     return DesireTier.HIGH;
