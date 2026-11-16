@@ -2,11 +2,18 @@
 //
 //   npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--name=<name>]
 //   npm run batch -- start <games> <flags> --data [--explore=0.03]   data batch (exploration on)
-//   npm run batch -- start <games> <flags> --screen   screen batch: every game stops at 31:00 game time
-//                                          (about half the time); judged on the gold lead at 30:00 only
+//   npm run batch -- start <games> <flags> --screen[=<min>]   screen batch: every game stops one minute after
+//                                          <min> (default 30, so 31:00: about half the time); judged on the gold
+//                                          lead at <min>:00 only. --screen=15 for changes that act in the laning phase
+//   npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]   early stop for a running batch: stops
+//                                          (with --stop) once its paired gold lead is clearly worse than the
+//                                          baseline's, by an O'Brien-Fleming boundary fixed before the batch
+//   npm run batch -- rerun <name> <game> [--force]   replay one game of a batch whose game died (no record);
+//                                          refuses when bots/ differs from the batch's commit unless --force
 //   npm run batch -- status [<name>]       progress of a batch (default: the newest)
 //   npm run batch -- report [<name>]       result per game, per lineup pair, and the verdict
-//   npm run batch -- compare <a> <b>       win rate of batch a against batch b (b is the baseline; b1+b2 pools baselines)
+//   npm run batch -- compare <a> <b> [--at=<min>]   batch a against baseline b (b1+b2 pools baselines); gold
+//                                          at 30:00, or at the shortest screen's minute, or at --at
 //   npm run batch -- stop <name>           stop a batch: its queue, its games, its port locks
 //   npm run batch -- ledger [<filter>]     one line per batch: kind, flags, commit, games, wins, gold lead at 30:00
 //   npm run batch -- smoke <flags> [--game=1] [--until=25] [--expect=<re>]... [--forbid=<re>]...
@@ -67,6 +74,17 @@ for (const a of process.argv.slice(2)) {
     else pos.push(a);
 }
 const distro = opts.distro || "Ubuntu";
+// The minute the gold lead is read at: 30, or the shortest screen's minute among the batches compared, or --at.
+let AT = 30;
+const manifestOf = name => {
+    const f = path.join(runsDir, name, "manifest.json");
+    if (!fs.existsSync(f)) fail(`No batch ${name}`);
+    return JSON.parse(fs.readFileSync(f, "utf8"));
+};
+const screenMinute = m => (m.screen ? Math.floor(m.screen / 60) - 1 : Infinity);
+function setGoldMinute(names) {
+    AT = opts.at ? Number(opts.at) : Math.min(30, ...names.map(n => screenMinute(manifestOf(n))));
+}
 const newest = () => {
     if (!fs.existsSync(runsDir)) fail("No batches yet.");
     const all = fs
@@ -92,11 +110,15 @@ else if (cmd === "stop") stop(pos[1]);
 else if (cmd === "ledger") ledger(pos[1]);
 else if (cmd === "smoke") smoke(pos[1]);
 else if (cmd === "smokecheck") smokecheck(pos[1]);
+else if (cmd === "early") early(pos[1], pos[2]);
+else if (cmd === "rerun") rerun(pos[1], pos[2]);
 else
     fail(
-        "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03] | --screen] [--partial] [--name=]\n" +
+        "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03] | --screen[=<min>]] [--partial] [--name=]\n" +
             "       npm run batch -- status|report [<name>]\n" +
-            "       npm run batch -- compare <name> <baseline>[+<baseline>...]\n" +
+            "       npm run batch -- compare <name> <baseline>[+<baseline>...] [--at=<min>]\n" +
+            "       npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]\n" +
+            "       npm run batch -- rerun <name> <game> [--force]\n" +
             "       npm run batch -- stop <name>\n" +
             "       npm run batch -- ledger [<filter>]\n" +
             "       npm run batch -- smoke <flags> [--game=1] [--until=25] [--expect=<re>]... [--forbid=<re>]...\n" +
@@ -188,6 +210,7 @@ function parseGames(s) {
 
 function start() {
     const games = parseGames(pos[1]);
+    if (opts.screen !== undefined && opts.screen !== true && !(Number(opts.screen) >= 5 && Number(opts.screen) <= 60)) fail("--screen=<min> takes 5 to 60 minutes");
     const flags = pos[2];
     if (!flags) fail("Name the flags for the new team, e.g. arbiter,laning (or none for plain OHA on both teams)");
     const data = opts.data === true;
@@ -211,7 +234,9 @@ function start() {
 
     const git = a => (spawnSync("git", a, { cwd: root, encoding: "utf8" }).stdout || "").trim();
     const commit = git(["rev-parse", "--short", "HEAD"]) + (git(["status", "--porcelain", "--", "bots", "typescript/bots"]) ? "+dirty" : "");
-    const screen = opts.screen === true ? 31 * 60 : 0; // stop at 31:00: past the 30:00 sample with room for the 2 s POS cadence
+    // Stop one minute after the gold sample (default 30:00, so 31:00), room for the 2 s POS cadence.
+    const screenAt = opts.screen === true ? 30 : opts.screen ? Number(opts.screen) : 0;
+    const screen = screenAt ? (screenAt + 1) * 60 : 0;
     if (screen && data) fail("--screen and --data do not mix");
     const manifest = { name, flags, kind: data ? "data" : "eval", commit, parallel, timescale, explore: Number(explore), started: new Date().toISOString(), games: {} };
     if (screen) manifest.screen = screen;
@@ -225,9 +250,17 @@ function start() {
     fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     fs.writeFileSync(path.join(dir, "games.txt"), games.join("\n") + "\n");
 
+    launch(dir, name, "games.txt", parallel, timescale, screen);
+    console.log(`Batch ${name} (${manifest.kind}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
+    console.log(`  Logs: ${path.relative(root, dir)}   Progress: npm run batch -- status   Results: npm run batch -- report`);
+}
+
+// Copies the repo's bots folder and the batch's cfg into WSL and starts headless/batch.sh for the games in
+// <gamesFile> (in the batch folder). <runName> is the WSL run folder: the batch's name, or <name>-r<game> for a rerun.
+function launch(dir, runName, gamesFile, parallel, timescale, screen) {
     const repo = toWsl(root);
     const win = toWsl(dir);
-    const B = `/opt/oha-runs/${name}`;
+    const B = `/opt/oha-runs/${runName}`;
     const H = `${B}/scripts`; // per batch: rewriting a script a running batch is reading would break it
     const r = wslScript(
         dir,
@@ -238,7 +271,7 @@ function start() {
             `for f in game.sh batch.sh; do tr -d '\\r' < ${sq(repo)}/typescript/post-process/headless/$f > ${H}/$f; done`,
             `rsync -a --delete --exclude '*.matchbak' ${sq(repo + "/bots/")} ${B}/base/`,
             `rsync -a ${sq(win + "/cfg/")} ${B}/cfg/`,
-            `tr -d '\\r' < ${sq(win + "/games.txt")} > ${B}/games.txt`,
+            `tr -d '\\r' < ${sq(win + "/" + gamesFile)} > ${B}/games.txt`,
             `setsid nohup bash ${H}/batch.sh ${B} ${parallel} ${timescale} ${sq(win)} ${screen} > ${B}/batch.out 2>&1 < /dev/null &`,
             // Wait until the batch has started its first game: a detached process can die with the WSL session
             // if that session closes too soon (seen when two batches were launched back to back).
@@ -254,8 +287,64 @@ function start() {
         windowsHide: true,
     });
     keep.unref();
-    console.log(`Batch ${name} (${manifest.kind}${screen ? ", screen: stops at 31:00" : ""}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
-    console.log(`  Logs: ${path.relative(root, dir)}   Progress: npm run batch -- status   Results: npm run batch -- report`);
+}
+
+// Replays one game of a batch into the same batch folder, e.g. a game whose server died (ev-gf g24 on
+// 2026-11-17: its log stops at 40:22 with no MATCHREC, which kept the batch from ever being complete).
+// The old log is kept as console.g<n>.dead.log. The game must play the batch's code: bots/ is compared
+// with the batch's commit, and a difference stops the rerun unless --force (say why in the log).
+function rerun(name, game) {
+    if (!name || !game) fail("Usage: npm run batch -- rerun <name> <game> [--force]");
+    const dir = path.join(runsDir, name);
+    const m = manifestOf(name);
+    if (!m.games[game]) fail(`Game ${game} is not in batch ${name}`);
+    if (!fs.existsSync(path.join(dir, "cfg", `g${game}`))) fail(`No cfg/g${game} in ${name}`);
+    const log = path.join(dir, `console.g${game}.log`);
+    if (fs.existsSync(log) && readRec(log).rec && opts.force !== true) fail(`Game ${game} of ${name} has a match record; nothing to rerun (--force to replay anyway)`);
+    const commit = String(m.commit || "").replace("+dirty", "");
+    const d = spawnSync("git", ["diff", "--stat", commit, "--", "bots", ":(exclude)bots/FretBots"], { cwd: root, encoding: "utf8" }); // FretBots is not loaded in headless games
+    if (d.status !== 0) fail(`Cannot compare bots/ with the batch's commit ${commit}:\n${d.stderr}`);
+    if (d.stdout.trim() && opts.force !== true)
+        fail(`bots/ differs from ${name}'s commit ${commit}, so the rerun would play other code:\n${d.stdout.trim().split("\n").slice(-12).join("\n")}\nRun it from a checkout of ${commit}, or add --force when the difference is behind flags this batch does not use.`);
+    if (fs.existsSync(log)) fs.renameSync(log, path.join(dir, `console.g${game}.dead.log`));
+    fs.writeFileSync(path.join(dir, `rerun.g${game}.txt`), `${game}\n`);
+    launch(dir, `${name}-r${game}`, `rerun.g${game}.txt`, 1, m.timescale || 8, m.screen || 0);
+    fs.appendFileSync(path.join(dir, "status.log"), `${new Date().toTimeString().slice(0, 8)} rerun of g${game} started${d.stdout.trim() ? " (--force: bots/ differs from the batch's commit)" : ""}\n`);
+    console.log(`Rerun of ${name} g${game} started; its log lands as console.g${game}.log (old one kept as console.g${game}.dead.log).`);
+}
+
+// Early stop: a batch whose change is clearly worse stops before its 32 games, so its slots go to the next
+// test. Paired gold lead (as compare) over the games finished so far; one-sided, O'Brien-Fleming boundary
+// z = 2.024 / sqrt(t), t = games paired / games in the batch (overall alpha about 5% across looks; at 8 of 32
+// games z must pass 4.05, at 16 2.86, at 24 2.34). Needs 8 paired games. Only stops for harm: a good change
+// still runs to the end, where compare judges it. The five original flags screened on 2026-11-17 took 32
+// games each to show what 16 showed (fight -5.9k).
+function early(name, base) {
+    if (!name || !base) fail("Usage: npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]");
+    setGoldMinute([name, ...base.split("+")]);
+    const A = results(name);
+    const Bb = pooled(base);
+    const gb = Object.fromEntries(Bb.rows.filter(r => r.gold && r.lead30 !== null).map(r => [r.g, r.lead30]));
+    let rows = A.rows.filter(r => r.gold && r.lead30 !== null && r.g in gb);
+    // --upto=<n>: backtest on a finished batch, as if only its first n games (by finish time) were in.
+    if (opts.upto) {
+        const t = r => fs.statSync(path.join(runsDir, name, `console.g${r.g}.log`)).mtimeMs;
+        rows = rows.sort((x, y) => t(x) - t(y)).slice(0, Number(opts.upto));
+    }
+    const diffs = rows.map(r => r.lead30 - gb[r.g]);
+    const n = diffs.length;
+    if (n < 8) return console.log(`${name}: ${n} paired games so far; the early check needs 8. Continue.`);
+    const mean = diffs.reduce((a, x) => a + x, 0) / n;
+    const sd = Math.sqrt(diffs.reduce((a, x) => a + (x - mean) ** 2, 0) / (n - 1));
+    const z = mean / (sd / Math.sqrt(n));
+    const bound = 2.024 / Math.sqrt(Math.min(1, n / A.total));
+    const worse = z < -bound;
+    console.log(`${name} vs ${base}: gold lead at ${AT}:00 paired over ${n} of ${A.total} games: ${k1(mean)} (z ${z.toFixed(2)}; stop boundary -${bound.toFixed(2)}).`);
+    console.log(worse ? "Early verdict: STOP, clearly worse (Gold FAIL)." : z > bound ? "Early verdict: clearly better so far; let it finish (compare judges it)." : "Early verdict: continue.");
+    if (worse && opts.stop === true && !opts.upto) {
+        stop(name);
+        fs.appendFileSync(path.join(runsDir, name, "status.log"), `${new Date().toTimeString().slice(0, 8)} early stop: ${k1(mean)} at ${AT}:00 over ${n} games, z ${z.toFixed(2)} < -${bound.toFixed(2)}\n`);
+    }
 }
 
 function stop(name) {
@@ -298,7 +387,7 @@ function readRec(file) {
     // deaths before 10:00 per team (DEATH lines, Utils.DebugMode)
     const d10 = { 2: 0, 3: 0 };
     for (const m of text.matchAll(/DEATH team=(\d) hero=\S+ t=(-?\d+)/g)) if (Number(m[2]) <= 600) d10[m[1]]++;
-    // Team net worth at 30:00 (POS trace lines, Utils.DebugMode), or at the last sample if the game ended sooner.
+    // Team net worth at AT:00 (30:00 by default; POS trace lines, Utils.DebugMode), or at the last sample if the game ended sooner.
     const nw = { 2: {}, 3: {} };
     let nw30 = null;
     let nw10 = null;
@@ -306,7 +395,7 @@ function readRec(file) {
     for (const m of text.matchAll(/\] POS team=(\d) hero=(\S+) t=([\d.-]+) .* nw=(\d+)/g)) {
         nw[m[1]][m[2]] = Number(m[4]);
         if (nw10 === null && Number(m[3]) >= 10 * 60) nw10 = Sums(nw);
-        if (Number(m[3]) >= 30 * 60) {
+        if (Number(m[3]) >= AT * 60) {
             nw30 = Sums(nw);
             reached30 = true;
             break;
@@ -371,7 +460,7 @@ function results(name) {
         const nt = info.newTeam === "radiant" ? 2 : 3;
         const lead30 = r.nw30 ? r.nw30[nt] - r.nw30[5 - nt] : null;
         const lead10 = r.nw10 ? r.nw10[nt] - r.nw10[5 - nt] : null;
-        // A screen game is stopped at 31:00 without a MATCHREC; it counts once its log reached 30:00.
+        // A screen game is stopped one minute past its sample without a MATCHREC; it counts once its log reached AT:00.
         const ok = r.rec || (m.screen && r.reached30);
         rows.push({ g, info, state: ok ? "done" : "no MATCHREC", ...r, lead30, lead10 });
     }
@@ -382,6 +471,7 @@ function results(name) {
 }
 
 function report(name) {
+    setGoldMinute([name]);
     const { m, rows, played, won, total, kind } = results(name);
     console.log(`Batch ${name} (${kind}): new team flags ${m.flags}, explore ${m.explore}`);
     console.log("game  pair  new      winner   result  minutes  kills new-old  nw10 new-old  lh10 new-old  d10 new-old  errors  decisions");
@@ -399,7 +489,7 @@ function report(name) {
             continue;
         }
         if (!r.rec) {
-            console.log(head + `screened, gold lead at 30:00 ${k1(r.lead30)}`);
+            console.log(head + `screened, gold lead at ${AT}:00 ${k1(r.lead30)}`);
             continue;
         }
         const { rec, errors, decisions, d10 } = r;
@@ -423,7 +513,7 @@ function report(name) {
                 `${String(Math.round(rec.duration / 60)).padEnd(9)}${k.padEnd(16)}${nw.padEnd(15)}${lh.padEnd(14)}${`${dNew}-${dOld}`.padEnd(12)}${String(errors).padEnd(8)}${decisions}`
         );
     }
-    if (m.screen) console.log(`Screened ${played} of ${total} games (stopped at 31:00).`);
+    if (m.screen) console.log(`Screened ${played} of ${total} games (stopped at ${m.screen / 60}:00).`);
     else console.log(`Per lineup pair: ${Object.entries(pairs).map(([p, v]) => `pair ${p} ${v.w}/${v.n}`).join(", ")}`);
     if (!m.screen) console.log(`New team won ${won} of ${played} finished games.`);
     if (played && !m.screen) console.log(`Average per game: nw10 new-old ${Math.round(sums.nw / played)}, lh10 new-old ${Math.round(sums.lh / played)}, deaths before 10:00 new-old ${(sums.d10 / played).toFixed(1)}`);
@@ -431,10 +521,10 @@ function report(name) {
     const leads = rows.filter(r => r.state === "done" && r.lead30 !== null).map(r => r.lead30);
     if (leads.length > 1) {
         const [mean, lo30, hi30] = meanCI(leads);
-        console.log(`Gold lead at 30:00 (new - old): ${k1(mean)} per game, 95% range ${k1(lo30)} to ${k1(hi30)} (${leads.length} games).`);
+        console.log(`Gold lead at ${AT}:00 (new - old): ${k1(mean)} per game, 95% range ${k1(lo30)} to ${k1(hi30)} (${leads.length} games).`);
     }
     if (m.screen) {
-        console.log("Win verdict: none (screen batch: games stop at 31:00). Judge it with compare against a baseline, then confirm a PASS with a full batch.");
+        console.log(`Win verdict: none (screen batch: games stop at ${m.screen / 60}:00). Judge it with compare against a baseline, then confirm a PASS with a full batch.`);
         return;
     }
     const [lo, hi] = wilson(won, played);
@@ -453,9 +543,10 @@ function ledger(filter) {
         .sort((a, b) => String(a[1].started).localeCompare(String(b[1].started)));
     console.log("started UTC  batch                     kind  flags                         commit        games   won    win%   gold@30");
     for (const [n] of names) {
+        setGoldMinute([n]);
         const r = results(n);
         const leads = r.rows.filter(x => x.state === "done" && x.lead30 !== null).map(x => x.lead30);
-        const gold = leads.length ? k1(leads.reduce((a, x) => a + x, 0) / leads.length) + (leads.length < r.played ? ` (${leads.length} games with POS lines)` : "") : "-";
+        const gold = leads.length ? k1(leads.reduce((a, x) => a + x, 0) / leads.length) + (AT !== 30 ? ` @${AT}:00` : "") + (leads.length < r.played ? ` (${leads.length} games with POS lines)` : "") : "-";
         const started = String(r.m.started || "").slice(5, 16).replace("T", " ");
         console.log(
             `${started.padEnd(13)}${n.padEnd(26)}${(r.screen ? "scrn" : r.kind).padEnd(6)}${String(r.m.flags).padEnd(30)}${String(r.m.commit || "?").padEnd(14)}` +
@@ -484,7 +575,7 @@ function goldScreen(a, b, A, Bb) {
     const diffs = Object.keys(ga).filter(g => g in gb).map(g => ga[g] - gb[g]);
     if (diffs.length < 2) return;
     const [mean, lo, hi] = meanCI(diffs);
-    console.log(`Gold screen, lead at 30:00 ${a} - ${b}, paired over ${diffs.length} games: ${k1(mean)}, 95% range ${k1(lo)} to ${k1(hi)}.`);
+    console.log(`Gold screen, lead at ${AT}:00 ${a} - ${b}, paired over ${diffs.length} games: ${k1(mean)}, 95% range ${k1(lo)} to ${k1(hi)}.`);
     const complete = A.goldPlayed === A.total && Bb.goldPlayed === (Bb.goldTotal ?? Bb.total);
     if (!complete) console.log("Gold verdict: none yet (both batches must be complete).");
     else console.log(`Gold verdict: ${lo > 0 ? "PASS (confirm on wins)" : hi < 0 ? "FAIL" : "inconclusive"}.`);
@@ -500,13 +591,13 @@ function goldScreen(a, b, A, Bb) {
     // 30:00. Remove it: diff30 - b * diff10, b = slope of lead30 on lead10 over the baseline's games.
     const both = Bb.rows.filter(r => r.gold && r.lead10 != null && r.lead30 !== null);
     const gs = Object.keys(ga).filter(g => g in gb && g in ta && g in tb);
-    if (both.length >= 8 && gs.length >= 2) {
+    if (AT > 10 && both.length >= 8 && gs.length >= 2) {
         const mx = both.reduce((x, r) => x + r.lead10, 0) / both.length;
         const my = both.reduce((x, r) => x + r.lead30, 0) / both.length;
         const sxx = both.reduce((x, r) => x + (r.lead10 - mx) ** 2, 0);
         const slope = sxx > 0 ? both.reduce((x, r) => x + (r.lead10 - mx) * (r.lead30 - my), 0) / sxx : 0;
         const [ma, la, ha] = meanCI(gs.map(g => ga[g] - gb[g] - slope * (ta[g] - tb[g])));
-        console.log(`Gold at 30:00 adjusted for the 10:00 lead (slope ${slope.toFixed(2)}; use for changes that act only after 10:00): ${k1(ma)}, 95% range ${k1(la)} to ${k1(ha)}.`);
+        console.log(`Gold at ${AT}:00 adjusted for the 10:00 lead (slope ${slope.toFixed(2)}; use for changes that act only after 10:00): ${k1(ma)}, 95% range ${k1(la)} to ${k1(ha)}.`);
     }
 }
 
@@ -549,7 +640,8 @@ function pooled(spec) {
 }
 
 function compare(a, b) {
-    if (!a || !b) fail("Usage: npm run batch -- compare <name> <baseline>[+<baseline>...]");
+    if (!a || !b) fail("Usage: npm run batch -- compare <name> <baseline>[+<baseline>...] [--at=<min>]");
+    setGoldMinute([a, ...b.split("+")]);
     const A = results(a);
     const Bb = pooled(b);
     for (const [n, x] of [[a, A], [b, Bb]]) {
@@ -561,7 +653,7 @@ function compare(a, b) {
     if (!A.played || !Bb.played) return;
     goldScreen(a, b, A, Bb);
     if (A.screen || Bb.screen) {
-        console.log("Win verdict: none (screen batch: games stop at 31:00). On a Gold PASS, confirm with a full eval batch.");
+        console.log("Win verdict: none (screen batch: no game reaches its end). On a Gold PASS, confirm with a full eval batch.");
         return;
     }
     // Paired by game number (same lineup, same side): a game's own lineup effect cancels. The method review
