@@ -38,6 +38,23 @@ for (const f of luaFiles) {
 }
 if (rawRequires > 5) failures.push(`... and ${rawRequires - 5} more files with raw require("bots.x")`);
 
+// 4. Flag names agree: every IsOn("x") in the bot code is in match-setup.js FLAGS (otherwise the flag can
+//    never be switched on) and in the FlagName type in flags.ts, and every listed flag is read somewhere.
+{
+    const setup = fs.readFileSync(path.join(root, "typescript/post-process/match-setup.js"), "utf8");
+    const listed = new Set(JSON.parse((setup.match(/const FLAGS = (\[[^\]]*\])/) || [, "[]"])[1].replace(/'/g, '"')));
+    const typeText = fs.readFileSync(path.join(root, "typescript/bots/FunLib/behavior/flags.ts"), "utf8");
+    const typed = new Set([...((typeText.match(/type FlagName =([^;]*);/) || [, ""])[1].matchAll(/"([a-z0-9_]+)"/g))].map(m => m[1]));
+    const used = new Set();
+    for (const f of luaFiles) for (const m of fs.readFileSync(f, "utf8").matchAll(/IsOn\(\s*["']([a-z0-9_]+)["']\s*\)/g)) used.add(m[1]);
+    for (const n of used) {
+        if (!listed.has(n)) failures.push(`Flag "${n}" is read with IsOn but missing from FLAGS in match-setup.js (it can never be switched on)`);
+        if (!typed.has(n)) failures.push(`Flag "${n}" is read with IsOn but missing from FlagName in flags.ts`);
+    }
+    for (const n of listed) if (!used.has(n)) failures.push(`Flag "${n}" is in match-setup.js FLAGS but no bot code reads it`);
+    for (const n of typed) if (!listed.has(n)) failures.push(`Flag "${n}" is in FlagName (flags.ts) but missing from FLAGS in match-setup.js`);
+}
+
 const jsDir = path.join(root, "typescript/post-process");
 const jsFiles = fs.readdirSync(jsDir).filter(f => f.endsWith(".js")).map(f => path.join(jsDir, f));
 for (const f of jsFiles) {
