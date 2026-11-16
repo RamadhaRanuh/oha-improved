@@ -299,9 +299,6 @@ function DefenceOf(id)
     end
     return nil
 end
-function ____exports.Bails(bot)
-    return IsOn("bail") and jmz.GetHP(bot) < ____exports.BAIL_HP
-end
 local UPDATE = 1
 local THREAT_RADIUS = 1600
 local SEEN = 3
@@ -1047,7 +1044,7 @@ end
 --- Team roam: walk to a defence or push gather point. HIGH while walking there, else 0.
 function ____exports.GatherDesire(bot)
     Update()
-    if not bot:IsAlive() or not bot:IsBot() or ____exports.Bails(bot) then
+    if not bot:IsAlive() or not bot:IsBot() then
         return 0
     end
     local id = bot:GetPlayerID()
@@ -1091,16 +1088,10 @@ local function FarFromGroup(bot)
     end
     return moving[id] == true
 end
---- Behaviour flag `bail`: below BAIL_HP a bot drops every group role (push, siege commit, defence,
--- regroup, gather) so retreat can win. In the `group` batches the new team died 11.6 times per game
--- after 20:00 having started its retreat below 40% health (plain OHA 7.5): push and siege bid 0.75-0.85
--- down to 35% health, defence at least HIGH at any health, regroup and gather HIGH down to 40% or 0%,
--- while retreat was already asking 0.5 or more.
-____exports.BAIL_HP = 0.55
 --- Team roam: walk to the rally point. HIGH while far from it (hysteresis: REGROUP_RADIUS out, REGROUP_ARRIVE in), else 0.
 function ____exports.RegroupDesire(bot)
     Update()
-    if not bot:IsAlive() or not bot:IsBot() or jmz.GetHP(bot) < REGROUP_MIN_HP or ____exports.Bails(bot) then
+    if not bot:IsAlive() or not bot:IsBot() or jmz.GetHP(bot) < REGROUP_MIN_HP then
         return 0
     end
     if not FarFromGroup(bot) then

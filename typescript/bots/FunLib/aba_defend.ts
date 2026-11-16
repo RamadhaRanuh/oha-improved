@@ -624,7 +624,7 @@ export function GetDefendDesire(bot: Unit, lane: Lane): BotModeDesire {
 
     // 2) compute and publish
     let res = GetDefendDesireHelper(bot, lane);
-    if (role === "defend" && !Group.Bails(bot)) res = math.max(res, DesireTier.HIGH) as BotModeDesire;
+    if (role === "defend") res = math.max(res, DesireTier.HIGH) as BotModeDesire;
     if (role === "defend_forced") res = math.max(res, DesireTier.FORCED) as BotModeDesire;
     // jmz.Utils.SetCachedVars(cacheKey, res);
     (bot as any).defendDesire = res;

@@ -28,7 +28,6 @@
 import { Barracks, Lane, Tower, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import * as jmz from "bots/FunLib/jmz_func";
 import * as Utils from "bots/FunLib/utils";
-import { IsOn } from "./flags";
 
 const ROSHAN_FIRST_TIME = 20 * 60; // tunable
 const NUMBERS_LEAD = 2; // allies alive minus enemies alive needed to siege without the Aegis (tunable)
@@ -70,10 +69,7 @@ export function HighGroundOpen(): [boolean, string] {
     const allies = jmz.GetNumOfAliveHeroes(false);
     const enemies = jmz.GetNumOfAliveHeroes(true);
     const aegis = jmz.DoesTeamHaveAegis();
-    // Behaviour flag `siegecut`: a hero lead alone does not open high ground. In ev-group / ev-group2,
-    // lead-started sieges (134) took a barracks 12% of the time, Aegis ones (58) 27%, while the new team
-    // died about 7 times per game in the enemy base after 20:00, almost all inside siege windows.
-    if (allies - enemies >= NUMBERS_LEAD && !IsOn("siegecut")) {
+    if (allies - enemies >= NUMBERS_LEAD) {
         cacheOpen = true;
         cacheWhy = `lead${allies}v${enemies}`;
     } else if (enemies <= ENEMY_FEW) {

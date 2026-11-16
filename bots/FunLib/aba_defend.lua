@@ -1238,7 +1238,7 @@ function ____exports.GetDefendDesire(bot, lane)
         end
     end
     local res = ____exports.GetDefendDesireHelper(bot, lane)
-    if role == "defend" and not Group.Bails(bot) then
+    if role == "defend" then
         res = math.max(res, DesireTier.HIGH)
     end
     if role == "defend_forced" then
