@@ -4,7 +4,7 @@
 //   npm run batch -- start <games> <flags> --data [--explore=0.03]   data batch (exploration on)
 //   npm run batch -- status [<name>]       progress of a batch (default: the newest)
 //   npm run batch -- report [<name>]       result per game, per lineup pair, and the verdict
-//   npm run batch -- compare <a> <b>       win rate of batch a against batch b (b is the baseline)
+//   npm run batch -- compare <a> <b>       win rate of batch a against batch b (b is the baseline; b1+b2 pools baselines)
 //   npm run batch -- stop <name>           stop a batch: its queue, its games, its port locks
 //
 // <games> are measurement game numbers as in `npm run match` (lineup pair and side rotation), e.g. 1-8 or 1,2,5.
@@ -116,7 +116,9 @@ function start() {
     if (fs.existsSync(dir)) fail(`${path.relative(root, dir)} already exists; pick another --name`);
     fs.mkdirSync(dir, { recursive: true });
 
-    const manifest = { name, flags, kind: data ? "data" : "eval", parallel, timescale, explore: Number(explore), started: new Date().toISOString(), games: {} };
+    const git = a => (spawnSync("git", a, { cwd: root, encoding: "utf8" }).stdout || "").trim();
+    const commit = git(["rev-parse", "--short", "HEAD"]) + (git(["status", "--porcelain", "--", "bots", "typescript/bots"]) ? "+dirty" : "");
+    const manifest = { name, flags, kind: data ? "data" : "eval", commit, parallel, timescale, explore: Number(explore), started: new Date().toISOString(), games: {} };
     for (const g of games) {
         const r = spawnSync(process.execPath, [path.join(__dirname, "match-setup.js"), String(g), flags, `--explore=${explore}`, `--out=${path.join(dir, "cfg", `g${g}`)}`], { encoding: "utf8" });
         if (r.status !== 0) fail(`match-setup failed for game ${g}:\n${r.stderr || r.stdout}`);
@@ -354,12 +356,37 @@ function goldScreen(a, b, A, Bb) {
     else console.log(`Gold verdict: ${lo > 0 ? "PASS (confirm on wins)" : hi < 0 ? "FAIL" : "inconclusive"}.`);
 }
 
+// Several baselines joined with "+" pool into one: wins add up, and each game's gold lead is the mean over the
+// baselines that played it. Pool only batches of the same flags whose code did not change for those flags
+// (code added behind other, off flags is inert): re-running an unchanged baseline for every change cost half
+// of the games on 2026-11-16 (ev-group, ev-group2/3/4: 128 games of the same setup).
+function pooled(spec) {
+    const names = spec.split("+");
+    const parts = names.map(n => results(n));
+    if (parts.length === 1) return parts[0];
+    const flags = new Set(parts.map(p => p.m.flags));
+    if (flags.size > 1) fail(`Pooled baselines must share their flags; got ${[...flags].join(" / ")}`);
+    const byGame = {};
+    for (const p of parts) for (const r of p.rows) if (r.state === "done" && r.lead30 !== null) (byGame[r.g] = byGame[r.g] || []).push(r.lead30);
+    const rows = Object.entries(byGame).map(([g, v]) => ({ g: Number(g), state: "done", lead30: v.reduce((x, y) => x + y, 0) / v.length }));
+    const games = {};
+    for (const p of parts) Object.assign(games, p.m.games);
+    return {
+        m: { flags: parts[0].m.flags, games, commit: parts.map(p => p.m.commit || "?").join("+") },
+        rows,
+        played: parts.reduce((x, p) => x + p.played, 0),
+        won: parts.reduce((x, p) => x + p.won, 0),
+        total: parts.reduce((x, p) => x + p.total, 0),
+        kind: parts.some(p => p.kind === "data") ? "data" : "eval",
+    };
+}
+
 function compare(a, b) {
-    if (!a || !b) fail("Usage: npm run batch -- compare <name> <baseline>");
+    if (!a || !b) fail("Usage: npm run batch -- compare <name> <baseline>[+<baseline>...]");
     const A = results(a);
-    const Bb = results(b);
+    const Bb = pooled(b);
     for (const [n, x] of [[a, A], [b, Bb]]) {
-        console.log(`${n} (${x.kind}, flags ${x.m.flags}): ${x.won}/${x.played} won${x.played < x.total ? `, ${x.total - x.played} of ${x.total} games not finished` : ""}`);
+        console.log(`${n} (${x.kind}, flags ${x.m.flags}, commit ${x.m.commit || "?"}): ${x.won}/${x.played} won${x.played < x.total ? `, ${x.total - x.played} of ${x.total} games not finished` : ""}`);
     }
     const ga = Object.keys(A.m.games).sort().join(",");
     const gb = Object.keys(Bb.m.games).sort().join(",");
