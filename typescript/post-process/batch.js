@@ -485,7 +485,7 @@ function goldScreen(a, b, A, Bb) {
     if (diffs.length < 2) return;
     const [mean, lo, hi] = meanCI(diffs);
     console.log(`Gold screen, lead at 30:00 ${a} - ${b}, paired over ${diffs.length} games: ${k1(mean)}, 95% range ${k1(lo)} to ${k1(hi)}.`);
-    const complete = A.goldPlayed === A.total && Bb.goldPlayed === Bb.total;
+    const complete = A.goldPlayed === A.total && Bb.goldPlayed === (Bb.goldTotal ?? Bb.total);
     if (!complete) console.log("Gold verdict: none yet (both batches must be complete).");
     else console.log(`Gold verdict: ${lo > 0 ? "PASS (confirm on wins)" : hi < 0 ? "FAIL" : "inconclusive"}.`);
     // The lead at 10:00 is for changes that act in the laning phase; no verdict (10:00 is not the target).
@@ -495,6 +495,18 @@ function goldScreen(a, b, A, Bb) {
     if (d10.length >= 2) {
         const [m10, l10, h10] = meanCI(d10);
         console.log(`Gold lead at 10:00 (information only), paired over ${d10.length} games: ${k1(m10)}, 95% range ${k1(l10)} to ${k1(h10)}.`);
+    }
+    // For a change that acts only after 10:00, the 10:00 difference is draw noise that the snowball doubles by
+    // 30:00. Remove it: diff30 - b * diff10, b = slope of lead30 on lead10 over the baseline's games.
+    const both = Bb.rows.filter(r => r.gold && r.lead10 != null && r.lead30 !== null);
+    const gs = Object.keys(ga).filter(g => g in gb && g in ta && g in tb);
+    if (both.length >= 8 && gs.length >= 2) {
+        const mx = both.reduce((x, r) => x + r.lead10, 0) / both.length;
+        const my = both.reduce((x, r) => x + r.lead30, 0) / both.length;
+        const sxx = both.reduce((x, r) => x + (r.lead10 - mx) ** 2, 0);
+        const slope = sxx > 0 ? both.reduce((x, r) => x + (r.lead10 - mx) * (r.lead30 - my), 0) / sxx : 0;
+        const [ma, la, ha] = meanCI(gs.map(g => ga[g] - gb[g] - slope * (ta[g] - tb[g])));
+        console.log(`Gold at 30:00 adjusted for the 10:00 lead (slope ${slope.toFixed(2)}; use for changes that act only after 10:00): ${k1(ma)}, 95% range ${k1(la)} to ${k1(ha)}.`);
     }
 }
 
@@ -526,10 +538,12 @@ function pooled(spec) {
     return {
         m: { flags: parts[0].m.flags, games, commit: parts.map(p => p.m.commit || "?").join("+") },
         rows,
-        played: parts.reduce((x, p) => x + p.played, 0),
+        // Screen batches have no winners: their games count for gold only, not as played games for wins.
+        played: parts.reduce((x, p) => x + (p.screen ? 0 : p.played), 0),
         goldPlayed: parts.reduce((x, p) => x + p.goldPlayed, 0),
+        goldTotal: parts.reduce((x, p) => x + p.total, 0),
         won: parts.reduce((x, p) => x + p.won, 0),
-        total: parts.reduce((x, p) => x + p.total, 0),
+        total: parts.reduce((x, p) => x + (p.screen ? 0 : p.total), 0),
         kind: parts.some(p => p.kind === "data") ? "data" : "eval",
     };
 }
