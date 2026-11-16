@@ -12,6 +12,9 @@ local Utils = require( GetScriptDirectory()..'/FunLib/utils' )
 local Thrash = require( GetScriptDirectory()..'/FunLib/behavior/thrash' )
 -- Cancel a TP into a lost fight (behavior/tpcancel, flag `retreat`).
 local TpCancel = require( GetScriptDirectory()..'/FunLib/behavior/flags' ).IsOn( 'retreat' ) and require( GetScriptDirectory()..'/FunLib/behavior/tpcancel' ) or nil
+-- Flag `fixes`: some item considers below read undefined globals (botLocation, nEnemyHeroes, ...).
+-- With the flag on they get real values; with it off they read the same globals as before.
+local bFixes = require( GetScriptDirectory()..'/FunLib/behavior/flags' ).IsOn( 'fixes' )
 -- Behaviour modules run under pcall: a bug in one must not take down the whole mode, and Valve's
 -- console only prints "error in error handling" for errors here, so print the real message (once each).
 local tBehaviorErrors = {}
@@ -6067,6 +6070,9 @@ X.ConsiderItemDesire["item_ash_legion_shield"] = function( hItem )
 end
 
 X.ConsiderItemDesire["item_flayers_bota"] = function( hItem )
+	local bAttacking = bFixes and J.IsAttacking(bot) or (not bFixes and bAttacking)
+	local botAttackRange = bFixes and bot:GetAttackRange() or botAttackRange
+	local nEnemyHeroes = bFixes and J.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or nEnemyHeroes
 
 	if J.IsGoingOnSomeone(bot) then
 		if  J.IsValidHero(botTarget)
@@ -6117,7 +6123,7 @@ X.ConsiderItemDesire["item_jidi_pollen_bag"] = function( hItem )
 
 	local nRadius = hItem:GetSpecialValueInt('debuff_radius')
 
-	local nInRangeEnemy = J.GetEnemiesNearLoc(botLocation, nRadius)
+	local nInRangeEnemy = J.GetEnemiesNearLoc(bFixes and bot:GetLocation() or botLocation, nRadius)
 
 	if J.IsInTeamFight(bot, 1200) then
         if #nInRangeEnemy >= 2 then
@@ -6161,6 +6167,7 @@ end
 X.ConsiderItemDesire["item_metamorphic_mandible"] = function( hItem )
 
 	local nDuration = hItem:GetSpecialValueInt('duration')
+	local nEnemyHeroes = bFixes and J.GetNearbyHeroes(bot, 1200, true, BOT_MODE_NONE) or nEnemyHeroes
 
 	if J.IsGoingOnSomeone(bot) then
 		if bot:WasRecentlyDamagedByAnyHero(2.0) then
@@ -8235,6 +8242,7 @@ X.ConsiderItemDesire["item_minotaur_horn"] = function( hItem )
     end
 
     local nEnemyHeroes = J.GetEnemiesNearLoc(bot:GetLocation(), 1200)
+	local nAllyHeroes = bFixes and J.GetAlliesNearLoc(bot:GetLocation(), 1200) or nAllyHeroes
 
 	if (J.IsGoingOnSomeone(bot) or (J.IsRetreating(bot) and not J.IsRealInvisible(bot)))
     and #nEnemyHeroes > 0

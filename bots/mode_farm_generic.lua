@@ -18,6 +18,8 @@ local bJungling = false
 -- Behaviour flag `group`: commit windows at high ground (behavior/siege) and no lone farming in the
 -- enemy half while enemies are missing (behavior/alone).
 local bGroupFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group')
+-- Flag `fixes`: J.Site.IsCampDangerous does not exist; with the flag on, treat the camp as not dangerous.
+local bFixesFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('fixes')
 local Siege = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/siege') or nil
 local Alone = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/alone') or nil
 local bAloneSafe = false -- farming was moved to our half: Think skips the lane creeps around the bot
@@ -666,7 +668,7 @@ function Think()
 			if nearest then
 				local newDist = GetUnitToLocationDistance(bot, nearest.cattr.location)
 				-- switch if we save >800 units or ETA improves a lot and danger isn’t worse
-				if newDist + 200 < oldDist and not J.Site.IsCampDangerous(bot, nearest) then
+				if newDist + 200 < oldDist and (bFixesFlag or not J.Site.IsCampDangerous(bot, nearest)) then
 					preferedCamp = nearest
 				end
 			end
