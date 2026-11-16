@@ -5,7 +5,6 @@ import { Barracks, BotMode, BotModeDesire, DamageType, Lane, Team, Tower, Unit, 
 import { IsValidUnit, GetLocationToLocationDistance, RadiantFountainTpPoint, DireFountainTpPoint } from "./utils";
 import { IsOn } from "./behavior/flags";
 import * as Siege from "./behavior/siege";
-import * as Fight from "./behavior/fight";
 import * as Group from "./behavior/group";
 import { getGlobalGameState, getGlobalLocationState, getCachedAlliesNearLoc, getCachedEnemiesNearLoc, autoCleanupCache, getCachedData } from "./global_cache";
 
@@ -18,8 +17,6 @@ Customize.ThinkLess = Customize.Enable ? Customize.ThinkLess : 1;
 const pingTimeDelta = 5;
 const StartToPushTime = 16 * 60; // after X mins, start considering to push.
 const BOT_MODE_DESIRE_EXTRA_LOW = 0.02;
-// Siege commit while this bot is in a hero fight: below attack HIGH (0.75) and fight hold MODERATE (0.5) even with the running-mode bonus.
-const SIEGE_FIGHT_YIELD = 0.3; // tunable
 // Lone pushing with no team push running (behavior/group): at most LOW.
 const NO_PUSH_CAP = 0.25; // tunable
 
@@ -304,17 +301,12 @@ export function GetPushDesireHelper(bot: Unit, lane: Lane): BotModeDesire {
         const commit = Siege.CommitLane();
         if (commit !== null) {
             if (commit !== lane) return BotModeDesire.VeryLow;
-            // Behaviour flag `fight`: a hero fight at the siege belongs to the fight module (attack / retreat).
-            // The flat commit desire (+ the running-mode bonus, 0.97) beat both: 9089765175 Axe and Puck stayed
-            // in push mode on Dire's high ground from 85% to 40% health while retreat asked 0.85 (deaths 51:49).
-            if (IsOn("fight") && Fight.FightOf(bot) !== null) return SIEGE_FIGHT_YIELD as BotModeDesire;
             if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP) return Siege.COMMIT_DESIRE as BotModeDesire;
         }
         // Team push below high ground (behavior/group): members push the chosen lane once they met.
         const role = Group.PushRoleOf(bot, lane);
         if (role === "skip" || role === "gather") return BotModeDesire.VeryLow;
         if (role === "push") {
-            if (IsOn("fight") && Fight.FightOf(bot) !== null) return SIEGE_FIGHT_YIELD as BotModeDesire;
             if (jmz.GetHP(bot) > Siege.COMMIT_MIN_HP) return Group.PUSH_DESIRE as BotModeDesire;
         }
     }

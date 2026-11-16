@@ -2,10 +2,6 @@ local X = {}
 
 local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
 local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
-local bRetreatFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('retreat')
-local bFightFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('fight')
--- Team fight state (behavior/fight): engaged bots only run when about to die; disengage sends all of them.
-local Fight = bFightFlag and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
 -- Fight decision log for the learned policy (behavior/decision_log; Customize.DecisionLog), all bots.
 local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
 if not DecisionLog.Active() then DecisionLog = nil end
@@ -195,13 +191,6 @@ function GetDesire()
     -- if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
     sWhy = 'none'
     local res = GetDesireHelper()
-    if Fight ~= nil then
-        local nAdjusted = SafeCall('fight', Fight.RetreatAdjust, bot, res, sWhy)
-        if nAdjusted ~= nil and nAdjusted ~= res then
-            if nAdjusted > res then sWhy = 'fight_'..((nAdjusted >= Fight.SURVIVE) and 'survive' or 'disengage') else sWhy = 'fight_engaged' end
-            res = nAdjusted
-        end
-    end
     if DecisionLog ~= nil then
         SafeCall('decision_log', DecisionLog.Tick, bot)
         local sForced = DecisionLog.Forced(bot)
@@ -234,14 +223,7 @@ function GetDesireHelper()
     or bot:HasModifier('modifier_dazzle_nothl_projection_soul_clone')
     or bot:HasModifier('modifier_skeleton_king_reincarnation_scepter_active')
     or bot:HasModifier('modifier_item_helm_of_the_undying_active')
-    -- Behaviour flag `retreat`: keep competing with Valve's evasive maneuvers when hurt and under hero fire.
-    -- Returning 0 there let bots sit in evasive from 45% health to death (S1 screen game: Axe, Earthshaker,
-    -- Luna, Lion and others, 7 deaths before 20:00). Also when outnumbered: quick test 9089523363, Juggernaut
-    -- sat in evasive in the enemy base from 71% health to death with 4 enemies on him and 2 allies.
-    or (botActiveMode == BOT_MODE_EVASIVE_MANEUVERS
-        and not (bRetreatFlag and bot:WasRecentlyDamagedByAnyHero(2)
-            and (J.GetHP(bot) < 0.5
-                or #J.GetEnemiesNearLoc(bot:GetLocation(), 1200) > #J.GetAlliesNearLoc(bot:GetLocation(), 1200))))
+    or botActiveMode == BOT_MODE_EVASIVE_MANEUVERS
     or (bot:GetUnitName() == 'npc_dota_hero_lone_druid' and bot:HasModifier('modifier_fountain_aura_buff') and DotaTime() < 0)
     or bot:HasModifier('modifier_item_satanic_unholy')
     or J.GetModifierTime(bot, "modifier_abaddon_borrowed_time") > 2
@@ -443,17 +425,6 @@ function GetDesireHelper()
     nEnemyNearbyCount = nEnemyNearbyCount + C.enemyNearbyExtra
     nAllyNearbyCount  = nAllyNearbyCount  + C.allyNearbyExtra
 
-    -- Behaviour flag `fight`: back out of fights the bot should not be in. S1 screen game deaths: Juggernaut
-    -- attacking at 41% and 30% health in lane, Lion attacking 2 heroes alone at 81%; this formula only reached
-    -- ~0.35 there. Valve's attack mode is no longer capped at 0.65 (fixed in the 25 June 2026 update; see
-    -- API/api_global.lua) and beat 0.78-0.90 retreat desires in the next test game, hence 0.9 / 0.85.
-    if bFightFlag then
-        local nDeepDesire = X.TooDeepDesire()
-        if nDeepDesire > 0 then return Why('too_deep', nDeepDesire) end
-        local nFightDesire, sFightWhy = X.FightExitDesire(nEnemyNearbyCount, nAllyNearbyCount, bWeAreStronger)
-        if nFightDesire > 0 then return Why(sFightWhy, nFightDesire) end
-    end
-
     if J.IsInLaningPhase()
         and J.IsValidBuilding(nAllyTowers[1])
         and bot:HasModifier('modifier_tower_aura_bonus')
@@ -528,113 +499,6 @@ function GetDesireHelper()
     nDesire = nDesire + nTowerDesire
 
     return Why(nTowerDesire > 0 and 'formula+tower' or 'formula', Min(nDesire, 1.0))
-end
-
--- Behaviour flag `fight` (see GetDesireHelper). Returns desire, rule name.
---   fight_lowhp_lane   laning phase, below 50% health, an enemy hero within 1000 that we cannot finish
---                      with three hits, and we were hit by a hero in the last 3 s
---   fight_lane_burst   laning phase, below 60% health, the enemy heroes within 1200 can deal our current
---                      health in 3 s (GetEstimatedDamageToTarget, spells ready), whether or not they hit us yet
---   fight_outnumbered  more enemy heroes near (visible within 1600, or seen there in the last 5 s) than
---                      allied ones including us, they are stronger, below 85% health, and we are fighting
---                      (attack or team roam mode, or hit by a hero in the last 2 s)
-local LANE_BURST_MAX_HP = 0.6 -- tunable
-local LANE_BURST_RADIUS = 1200 -- tunable
-function X.FightExitDesire(nEnemyCount, nAllyCount, bWeAreStronger)
-    local nRealEnemies = 0
-    local bCanFinish = false
-    for _, enemy in pairs(nEnemyHeroes) do
-        if J.IsValidHero(enemy) and not J.IsSuspiciousIllusion(enemy) then
-            nRealEnemies = nRealEnemies + 1
-            if J.IsInRange(bot, enemy, bot:GetAttackRange() + 150)
-            and J.CanKillTarget(enemy, bot:GetAttackDamage() * 3, DAMAGE_TYPE_PHYSICAL) then
-                bCanFinish = true
-            end
-        end
-    end
-    if nRealEnemies == 0 or bCanFinish then return 0, nil end
-
-    if J.IsInLaningPhase() and botHP < 0.5 and bot:WasRecentlyDamagedByAnyHero(3) then
-        for _, enemy in pairs(nEnemyHeroes) do
-            if J.IsValidHero(enemy) and not J.IsSuspiciousIllusion(enemy) and J.IsInRange(bot, enemy, 1000) then
-                return 0.9, 'fight_lowhp_lane'
-            end
-        end
-    end
-
-    -- Laning: the enemy heroes in reach can kill us in 3 s with what they have ready, even though nobody has
-    -- hit us yet. 9089819931: Crystal Maiden (35%, 11:26) and Earthshaker (34%, 13:58) stood in lane next to
-    -- two enemies with retreat desire about 0, and were burst from there.
-    if J.IsInLaningPhase() and botHP < LANE_BURST_MAX_HP then
-        local nIncoming = 0
-        for _, enemy in pairs(nEnemyHeroes) do
-            if J.IsValidHero(enemy) and not J.IsSuspiciousIllusion(enemy) and J.IsInRange(bot, enemy, LANE_BURST_RADIUS) then
-                nIncoming = nIncoming + enemy:GetEstimatedDamageToTarget(true, bot, 3.0, DAMAGE_TYPE_ALL)
-            end
-        end
-        if nIncoming >= bot:GetHealth() then return 0.9, 'fight_lane_burst' end
-    end
-
-    -- Caught by an enemy at least as fast as us (behavior/fight): running only gives it free hits; fight back.
-    if Fight ~= nil and SafeCall('fight', Fight.IsCaught, bot) then return 0, nil end
-    if nEnemyCount > nAllyCount and not bWeAreStronger and botHP < 0.85
-    -- RETREAT too: once out of hero damage for 2 s the rule would drop and hand the bot straight back to the fight.
-    and (botActiveMode == BOT_MODE_ATTACK or botActiveMode == BOT_MODE_TEAM_ROAM or botActiveMode == BOT_MODE_RETREAT
-        or bot:WasRecentlyDamagedByAnyHero(2)) then
-        -- 0.88, not 0.85: a mode at HIGH 0.75 plus the arbiter's incumbent bonus is 0.87 and held a defending
-        -- Lion against 3 enemies until he died (9090116913, 31:04). Same level as fight_disengage.
-        return 0.88, 'fight_outnumbered'
-    end
-    return 0, nil
-end
-
--- Behaviour flag `fight`: is the bot deeper in enemy territory than its group can hold?
--- Only in the enemy half of the map (closer to their ancient than ours). Threat counts:
---   +1 per enemy tower within 1000 that can shoot
---   +1 per living enemy hero seen within 2000 in the last 6 s
---   +0.5 per living enemy hero not seen for 6 s while we are within 5000 of their ancient (they are likely home)
---   +1 inside their base (within 4000 of their ancient)
--- against allied heroes within 1600, us included. Too deep when threat > allies + 0.5, unless we are
--- finishing a hero below 25% health in reach. Dead enemies do not count, so a group can still close a game
--- after a won fight. User playtest: bots chased or walked alone to the enemy ancient.
-local TOO_DEEP_ANCIENT_DIST = 6000 -- tunable
-function X.TooDeepDesire()
-    -- Not J.IsValidBuilding: it needs the unit visible and not invulnerable, and the enemy ancient is
-    -- usually neither, so this rule never fired (quick test 9089523363: deaths 1000-1600 from it, 0 too_deep).
-    if hEnemyAncient == nil or hEnemyAncient:IsNull() or hTeamAncient == nil or hTeamAncient:IsNull() then return 0 end
-    local dEnemyAncient = GetUnitToUnitDistance(bot, hEnemyAncient)
-    if dEnemyAncient >= GetUnitToUnitDistance(bot, hTeamAncient) then return 0 end
-    -- Deep means past their tier-2 towers (about 5000-6000 from their ancient), never lane play: with "the
-    -- enemy half" alone, Juggernaut's safe lane next to their tier-1 tower counted, and too_deep pulled him
-    -- out of lane 17-24 s a minute (quick test 9089559472: 1 last hit in the first 4 minutes).
-    if J.IsInLaningPhase() or dEnemyAncient > TOO_DEEP_ANCIENT_DIST then return 0 end
-
-    local hTarget = bot:GetAttackTarget()
-    if J.IsValidHero(hTarget) and J.GetHP(hTarget) < 0.25 and J.IsInRange(bot, hTarget, bot:GetAttackRange() + 200) then
-        return 0
-    end
-
-    local fThreat = 0
-    -- Invulnerable (backdoor-protected) towers still shoot, so they count too.
-    for _, tower in pairs(bot:GetNearbyTowers(1000, true)) do
-        if tower ~= nil and not tower:IsNull() and tower:IsAlive() then fThreat = fThreat + 1 end
-    end
-    for _, id in pairs(GetTeamPlayers(GetOpposingTeam())) do
-        if IsHeroAlive(id) then
-            local info = GetHeroLastSeenInfo(id)
-            local seen = info ~= nil and info[1] or nil
-            if seen ~= nil and seen.time_since_seen <= 6 then
-                if GetUnitToLocationDistance(bot, seen.location) <= 2000 then fThreat = fThreat + 1 end
-            elseif dEnemyAncient < 5000 then
-                fThreat = fThreat + 0.5
-            end
-        end
-    end
-    if dEnemyAncient < 4000 then fThreat = fThreat + 1 end
-
-    local nAllies = #J.GetAlliesNearLoc(bot:GetLocation(), 1600)
-    if fThreat > nAllies + 0.5 then return 0.85 end
-    return 0
 end
 
 function X.LowChanceToRun()
@@ -777,10 +641,6 @@ function X.ShouldRun()
 	then
 		if botTarget ~= nil and botTarget:IsHero()
 		   and J.GetHP(botTarget) > 0.35
-		   -- Behaviour flag `retreat`: only an actual chase counts. GetTarget() keeps the last hero any mode set
-		   -- (team roam, attack) long after the fight, and this rule then kept firing (S1 hybrid game:
-		   -- Juggernaut 40-57% retreat in several laning minutes).
-		   and (not bRetreatFlag or bot:GetAttackTarget() == botTarget or J.IsChasingTarget(bot, botTarget))
 		   and (  not J.IsInRange(bot,botTarget,bot:GetAttackRange() + 150) 
 				  or not J.CanKillTarget(botTarget, bot:GetAttackDamage() * 2.33, DAMAGE_TYPE_PHYSICAL) )
 		then
@@ -826,10 +686,6 @@ function X.ShouldRun()
 		
 		if  enemyAncientDistance > 2100
 			and enemyAncientDistance < GetUnitToUnitDistance(nEnemyTowers[1],enemyAncient) - rushEnemyTowerDistance
-			-- Behaviour flag `retreat`: no forced run past the tower while it shoots someone else and we are not
-			-- outnumbered. Turning round mid-fight got bots killed from behind (5 deaths in two S1 test games,
-			-- e.g. Earthshaker at 82% health).
-			and not (bRetreatFlag and nEnemyTowers[1]:GetAttackTarget() ~= bot and #hAllyHeroList >= #hEnemyHeroList)
 		then
 			local nTarget = J.GetProperTarget(bot);
 			if nTarget == nil
@@ -871,19 +727,8 @@ function X.ShouldRun()
             nLongEnemyTowers = bot:GetNearbyTowers(1100, true);
             nEnemyTowers     = bot:GetNearbyTowers(980, true);
         end
-        -- Behaviour flag `retreat`: only flee a tower that can actually hit us next: within its range
-        -- (700) plus 100, and not busy shooting a creep. 898 (980 mid) with no other check yanked bots
-        -- off last hits near the enemy tower (human game: 147 retreat samples in the laning phase).
-        local hEarlyTower = nEnemyTowers[1]
-        if bRetreatFlag and hEarlyTower ~= nil then
-            local hTowerTarget = hEarlyTower:GetAttackTarget()
-            if GetUnitToUnitDistance(bot, hEarlyTower) > 800
-            or (J.IsValid(hTowerTarget) and hTowerTarget ~= bot and not hTowerTarget:IsHero()) then
-                hEarlyTower = nil
-            end
-        end
         if ( botLevel <= 5 or DotaTime() < 5 * 60 )
-            and hEarlyTower ~= nil
+            and nEnemyTowers[1] ~= nil
         then
             return RunWhy('early_enemy_tower', 2);
         end

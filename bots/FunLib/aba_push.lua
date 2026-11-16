@@ -23,7 +23,7 @@ local function __TS__StringIncludes(self, searchString, position)
 end
 -- End of Lua Library inline imports
 local ____exports = {}
-local updateGameStateCache, updateLocationStateCache, updateUnitStateCache, presence_adjust, pingTimeDelta, StartToPushTime, BOT_MODE_DESIRE_EXTRA_LOW, SIEGE_FIGHT_YIELD, hEnemyAncient, PUSH_CACHE_TTL, gameStateCache, locationStateCache, unitStateCache, BASE_ANC_RADIUS
+local updateGameStateCache, updateLocationStateCache, updateUnitStateCache, presence_adjust, pingTimeDelta, StartToPushTime, BOT_MODE_DESIRE_EXTRA_LOW, hEnemyAncient, PUSH_CACHE_TTL, gameStateCache, locationStateCache, unitStateCache, BASE_ANC_RADIUS
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
 local ____dota = require(GetScriptDirectory().."/ts_libs/dota/index")
 local Barracks = ____dota.Barracks
@@ -42,7 +42,6 @@ local DireFountainTpPoint = ____utils.DireFountainTpPoint
 local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
 local IsOn = ____flags.IsOn
 local Siege = require(GetScriptDirectory().."/FunLib/behavior/siege")
-local Fight = require(GetScriptDirectory().."/FunLib/behavior/fight")
 local Group = require(GetScriptDirectory().."/FunLib/behavior/group")
 local ____global_cache = require(GetScriptDirectory().."/FunLib/global_cache")
 local getGlobalGameState = ____global_cache.getGlobalGameState
@@ -166,9 +165,6 @@ function ____exports.GetPushDesireHelper(bot, lane)
             if commit ~= lane then
                 return BotModeDesire.VeryLow
             end
-            if IsOn("fight") and Fight.FightOf(bot) ~= nil then
-                return SIEGE_FIGHT_YIELD
-            end
             if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP then
                 return Siege.COMMIT_DESIRE
             end
@@ -178,9 +174,6 @@ function ____exports.GetPushDesireHelper(bot, lane)
             return BotModeDesire.VeryLow
         end
         if role == "push" then
-            if IsOn("fight") and Fight.FightOf(bot) ~= nil then
-                return SIEGE_FIGHT_YIELD
-            end
             if jmz.GetHP(bot) > Siege.COMMIT_MIN_HP then
                 return Group.PUSH_DESIRE
             end
@@ -595,7 +588,6 @@ ____Customize_1.ThinkLess = ____Customize_Enable_0
 pingTimeDelta = 5
 StartToPushTime = 16 * 60
 BOT_MODE_DESIRE_EXTRA_LOW = 0.02
-SIEGE_FIGHT_YIELD = 0.3
 local NO_PUSH_CAP = 0.25
 hEnemyAncient = nil
 PUSH_CACHE_TTL = 0.5
@@ -863,24 +855,24 @@ function ____exports.PushThink(bot, lane)
     local towerDistanceToFountain = bTowerNearby and GetUnitToLocationDistance(nEnemyTowers[1], vTeamFountain) or 0
     for ____, creep in ipairs(nCreeps) do
         do
-            local __continue134
+            local __continue132
             repeat
                 if not jmz.IsValid(creep) or not jmz.CanBeAttacked(creep) then
-                    __continue134 = true
+                    __continue132 = true
                     break
                 end
                 if jmz.IsTormentor(creep) or jmz.IsRoshan(creep) then
-                    __continue134 = true
+                    __continue132 = true
                     break
                 end
                 if bTowerNearby and GetUnitToLocationDistance(creep, vTeamFountain) >= towerDistanceToFountain then
-                    __continue134 = true
+                    __continue132 = true
                     break
                 end
                 bot:Action_AttackUnit(creep, true)
                 return
             until true
-            if not __continue134 then
+            if not __continue132 then
                 break
             end
         end

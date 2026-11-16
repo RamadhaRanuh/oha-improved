@@ -21,26 +21,22 @@ Flags are set per team in `bots/Customize/general.lua`:
 
 ```lua
 Customize.Behavior = {
-    Radiant = { arbiter = true, laning = true, fight = true, retreat = true, group = true,
-                farm = true, roam = true, humanfeel = true, escape = true },
+    Radiant = { arbiter = true, laning = true, group = true, roam = true, humanfeel = true, escape = true },
     Dire    = { ... },
 }
 ```
 
 A missing table or key counts as off.
 
-**Recommended set (bot-vs-bot results, section 4a):** `arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`. Leave `fight`, `retreat` and `farm` off: they lost games against plain OHA. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Recommended set (bot-vs-bot results, section 4a):** `arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
 | `arbiter` | Desire tiers, a bonus for the running mode (fewer mode flips), mode-change counting | `behavior/arbiter`, `behavior/desire_tiers`, `behavior/thrash` |
 | `laning` | Lane trades, stepping out of harass range, camp pulls, lotus pool pickup | `behavior/laning`, `behavior/pull`, `behavior/lotus` |
-| `fight` | One shared fight state per engagement: engage, hold or disengage, plus focus target and initiator | `behavior/fight` |
-| `retreat` | Retreat rules tied to the fight state, laning burst danger, cancelling a TP into a lost fight | `mode_retreat_generic.lua`, `behavior/tpcancel` |
 | `group` | Team defence assignments, group pushes, regrouping, high-ground gate and Roshan first, no lone trips into danger | `behavior/group`, `behavior/siege`, `behavior/alone` |
-| `farm` | Stacking camps, jungling after repeated lane deaths, farm allotment | `behavior/camps`, `behavior/jungle` |
-| `roam` | Smoke ganks, counter-gank teleports | `behavior/gank` |
-| `humanfeel` | Varied pre-horn plans (feint, bounty steal, ambush, camp block), per-game randomness | `behavior/prehorn`, `behavior/rng` |
+| `roam` | Smoke ganks, counter-gank teleports | `behavior/gank`, `behavior/tpcancel` |
+| `humanfeel` | Varied pre-horn plans (feint, bounty steal, ambush, camp block), per-game randomness | `behavior/prehorn`, `behavior/rng`, `behavior/camps` |
 | `escape` | Retreat route that keeps away from chasing enemies | `behavior/escape` |
 | `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
 | `noregroup` | With `group`: no regroup walk to the rally point (in test) | `behavior/group` |
@@ -48,14 +44,21 @@ A missing table or key counts as off.
 
 **Tested and removed (2026-11-16, 32-game eval batches against `group`):** `bail` (group roles dropped below 55% health; 13/32 vs 18/32), `yield` (retreat outbids attack and group modes below 45% health; 14/32 vs 15/32), `siegecut` (a hero lead alone no longer opens high ground; 15/32 vs 17/32). How changes are tested and judged: [TESTING.md](TESTING.md).
 
+**Tested and removed (2026-11-17, screens on the base `group,fixes,corefarm` against the pooled baseline, gold at 30:00, all Gold FAIL):**
+- `fight` (−5.9k): one shared fight state per engagement (engage, hold or disengage), one focus target and an initiator; it replaced Valve's attack mode for every hero. Module `behavior/fight`, removed.
+- `retreat` (−3.9k): retreat rules tied to the fight state (`fight_outnumbered`, `fight_disengage`, `fight_survive`, `fight_lane_burst`, `too_deep`), evasive-maneuvers and tower-dive exceptions, and cancelling a TP into a lost fight (item-usage hooks into `behavior/tpcancel`).
+- `farm` (−3.3k): supports stacking camps in the laning phase, and jungling after repeated lane deaths. Module `behavior/jungle`, removed; the stacking part of `behavior/camps`, removed.
+
+All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept for the remaining flags: `behavior/tpcancel` (`roam`: counter-gank TPs skip a lost fight; nothing calls its mid-channel cancel now) and the camp list in `behavior/camps` (`humanfeel`: camp block). Sections 3 to 4a below keep their history.
+
 ### Match tooling
 
 Run these from `typescript/`:
 
 ```
-npm run match -- play arbiter,laning,fight,retreat,group,farm,roam,humanfeel,escape   # human-vs-bot: flags on both teams, debug prints on
-npm run match -- play none                                                            # plain OHA baseline
-npm run match -- reset                                                                # restore general.lua and utils.lua (do this before committing)
+npm run match -- play arbiter,laning,group,roam,humanfeel,escape   # human-vs-bot: flags on both teams, debug prints on
+npm run match -- play none                                          # plain OHA baseline
+npm run match -- reset                                              # restore general.lua and utils.lua (do this before committing)
 ```
 
 To record a game, load the recorder from the in-game console:
@@ -95,7 +98,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
 - **Pulls:** position 5 pulls the safe lane. Position 4 pulls the offlane, or the offlaner when it is alone in its lane. Timing comes from the real creep wave.
 - **Lotus pool:** a nearby support picks lotuses. Valve's own lotus mode never ran.
 
-### Fight (`fight`)
+### Fight (`fight`, removed 2026-11-17)
 
 - Enemies in contact are grouped into engagements. Each engagement has a ratio: how much faster we kill them than they kill us.
 - **States, with hysteresis:**
@@ -110,16 +113,16 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
   - An enemy out of sight counts at 50% of max health or more, never at the health it had when last seen nearly dead.
   - Below 15% health a bot leaves unless it is finishing a kill.
 
-### Retreat (`retreat`) and escape (`escape`)
+### Retreat (`retreat`, removed 2026-11-17) and escape (`escape`)
 
-- **Fight-aware retreat:**
+- **Fight-aware retreat** (`retreat`):
   - `fight_outnumbered` 0.88;
   - `fight_disengage` 0.88;
   - `fight_survive` 0.96;
   - `fight_lane_burst` 0.9 during laning, when the enemies near us can kill us in 3 s;
   - pre-horn: retreat when outnumbered.
-- **TP cancel:** a TP into a spot that has become a lost fight is stopped mid-channel.
-- **Escape route:** when enemies were seen within 2000 in the last 3 s, the bot compares routes home:
+- **TP cancel** (`retreat`): a TP into a spot that has become a lost fight is stopped mid-channel.
+- **Escape route** (`escape`): when enemies were seen within 2000 in the last 3 s, the bot compares routes home:
   - direct;
   - through one of our towers;
   - a sidestep to either side;
@@ -141,7 +144,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
 - **Siege:** no high-ground push unless we have the numbers (2+ more heroes alive, 2 or fewer enemies alive, or the Aegis). Otherwise Roshan first, then one committed high-ground lane.
 - **Alone:** no lone farming or warding deep in enemy territory while enemies are missing, and no lone tower defence against 2+.
 
-### Farm (`farm`)
+### Farm (`farm`, removed 2026-11-17)
 
 - Supports stack our camps at x:53.
 - A core that keeps dying in lane may jungle for a while and come back once caught up.
@@ -242,15 +245,13 @@ Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTIN
   | Test | Result |
   |---|---|
   | group | 40/40 |
-  | fight | 57/57 |
   | escape | 21/21 |
   | arbiter | all pass |
   | pull | 34 |
   | prehorn | 76 |
-  | jungle | 24 |
 
 - With debug prints on (`play` turns them on), the console log (`game/dota/console.<matchid>.log`) has one line per decision. Lines start with:
-  - `GROUP`, `FIGHT`, `ESCAPE`, `SIEGE`, `GANK`, `PREHORN`, `PULL` and `JUNGLE`: one per decision;
+  - `GROUP`, `ESCAPE`, `SIEGE`, `GANK`, `PREHORN` and `PULL`: one per decision;
   - `MODES`: once a minute per bot;
   - `THRASH`: mode-change counts;
   - `DEATH`: the last 8 s of each bot death (health, mode, retreat desire and reason, enemies and allies near).

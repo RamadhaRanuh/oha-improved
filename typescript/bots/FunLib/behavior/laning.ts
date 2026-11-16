@@ -24,8 +24,6 @@ import * as jmz from "bots/FunLib/jmz_func";
 import * as Utils from "bots/FunLib/utils";
 import { DesireTier } from "./desire_tiers";
 import * as Pull from "./pull";
-import * as Jungle from "./jungle";
-import * as Flags from "./flags";
 
 // ---- tunables -------------------------------------------------------------------------
 
@@ -422,8 +420,6 @@ export function GetDesire(bot: Unit): number {
     const mode = GetGameMode();
     if (mode === 11 /* GAMEMODE_MO */ || mode === 21 /* GAMEMODE_1V1MID */) return 1;
 
-    // Jungling after too many lane deaths (behavior/jungle, flag `farm`): farm mode has the bot.
-    if (Jungle.Active(bot)) return DesireTier.LOW;
     if (jmz.IsInLaningPhase()) return Tier(bot, "moderate", DesireTier.MODERATE);
 
     let time = DotaTime();
@@ -462,7 +458,7 @@ function StartBurst(bot: Unit, state: BotState, burst: Burst, until: number, tar
 export function BurstDesire(bot: Unit): number {
     const state = StateOf(bot);
     const now = DotaTime();
-    if (!jmz.IsInLaningPhase() || !bot.IsAlive() || Jungle.Active(bot)) {
+    if (!jmz.IsInLaningPhase() || !bot.IsAlive()) {
         if (state.burst !== "none") EndBurst(bot, state);
         Pull.Desire(bot); // lets a running pull end itself
         return 0;
@@ -505,9 +501,7 @@ export function BurstDesire(bot: Unit): number {
     // Quick tests 9089559472 / 9089566083: Juggernaut spent 15-34% of lane minutes in attack against
     // Centaur and Lion, then retreated or ran, and had 0-1 last hits in the first 4 minutes. Valve's attack
     // desire can exceed 0.9, so the burst bids just above it.
-    // Flag `fight`: attack mode runs only on the team's engage call (behavior/fight), so this veto would
-    // cancel it. Bot game 9090959010: Juggernaut disengaged at full health from 2-7x engages on Lion.
-    if (bot.GetActiveMode() === BotMode.Attack && jmz.IsCore(bot) && !Flags.IsOn("fight")) {
+    if (bot.GetActiveMode() === BotMode.Attack && jmz.IsCore(bot)) {
         const attackDesire = bot.GetActiveModeDesire();
         const fightTarget = FightTarget(bot);
         const why = fightTarget !== null ? LikelyKill(bot, fightTarget) : "no_target";
