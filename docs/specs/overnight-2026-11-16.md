@@ -1,6 +1,6 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
-## Current state (updated 2026-11-16 22:21)
+## Current state (updated 2026-11-16 22:25)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
@@ -8,7 +8,7 @@ How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -
 |---|---|
 | Base | `group,fixes` (`fixes` merged e7e8e52 by the user's call: correctness fixes, gold -0.9k inconclusive). Screen baseline for the base: sc-group-fixes; `group` alone: 49/96 over ev-group2/3/4 |
 | In test | `siegeback` full batch (ev-gf-siegeback) vs the full `group,fixes` baseline ev-gf (both running, done about 00:45) |
-| Next | full batch of the stack corefarm+siegeback (wt/stack, being built) if siegeback paired wins >= 0, else corefarm alone; vs ev-gf |
+| Next | at ~00:45: full batch of the stack (wt/stack 710a8a8: corefarm+siegeback; smoke queued) vs ev-gf, or corefarm alone if siegeback paired wins < 0; in parallel, 32-game screens of the existing flags on group,fixes, `laning` first (never tested past 16 games) |
 | Kept so far | `fixes` (by the user's decision, not by a batch) |
 | Removed after a complete batch | `bail`, `yield`, `siegecut` (53ba259), `noregroup` (d301818), `farmfree` (ce70e60) |
 | Parked | `learned` (1 of 6 games) |
@@ -131,3 +131,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **21:13** `corefarm` v2 smoke FAIL on its own expect: the new `skip=cap` never fired. Cause: group.ts Cap() is only called through arbiter.ts Wrap/Finalize, which does nothing unless the `arbiter` flag is on, and the base runs without `arbiter`; so the slot analyst's main mechanism (Cap holding core farm at LOW) is not active in any of our games, and the core farm gap comes from the team-roam pulls corefarm v1 already removes. No errors, the v1 skips fired (29 helpally, 15 regroup, 4 gather), so v2 equals v1 on the new base: screen sc-gf-corefarm started vs sc-group-fixes. The analyst agent file now says to confirm that code runs under the analysed flags.
 - **21:16** `siegeback` smoke PASS (51:53 game time, 14 late windows stopped or held for the new team, none for plain OHA, no errors). It acts after 35:00, so it is judged on full games and paired wins: ev-gf-siegeback started (32, 5 at once); its baseline ev-gf (group,fixes, full) starts when sc-gf-corefarm frees its slots.
 - **22:21** `corefarm` on group,fixes: screen sc-gf-corefarm vs sc-group-fixes, gold at 30:00 +2.7k (95% range -0.7k to +6.1k): the largest effect so far, just short of a pass (on `group` alone it was +0.8k). Full baseline ev-gf (group,fixes, 32 full games) started 22:19 next to ev-gf-siegeback. An implementer builds wt/stack (corefarm + siegeback) so the next full batch can start as soon as slots free.
+- **22:25** Gold-gap analyst (by source, 10:00-30:00, MODES lines carry cumulative last hits): corefarm moved +2.1k over 10-30 through last hits at 15-25 (farm share up 9 and 3 points), leaving the mean lead at 30:00 about +0.4k against plain OHA. What remains is variance that snowballs from the early game: games below -3k at 30:00 were already -2.8k at 10:00, games above +3k were +1.9k; death counts 10-30 are even. Remaining farm leak: 25-30 min (corefarm stops at 25:00; team last hits 81 vs 101 per 5 min), about +0.4k if extended. Roshan small and net positive. Decision (mine): the next lever is the early game; the existing `laning` flag (and the other existing flags, never tested past 16 games) get 32-game screens on group,fixes as slots free. Tooling gap noted: no tower-kill or Roshan-kill trace lines.
