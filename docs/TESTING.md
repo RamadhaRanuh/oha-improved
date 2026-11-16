@@ -4,6 +4,13 @@ How to test a behaviour change headless, judge it, and keep or drop it. The flag
 
 The **new team** is the flagged team, the **old team** plays plain OHA. Each game number fixes a lineup and side (`npm run match`), and games 4p-3..4p form **lineup pair** p: both lineups on both sides. A **base** is the flag set kept so far; a change is the base plus one new flag.
 
+## Who does what
+
+- **Orchestrator** (the main session): the only one that starts, stops or replays games, so the 10-game cap holds. Owns tooling, judging (`compare`), keep / drop / merge and the overnight log; writes no behaviour code.
+- **`oha-analyst`** (`.claude/agents/oha-analyst.md`, Sonnet, read-only, fresh per task): runs `diagnose` on finished batches and reports the top 3 gold leaks in at most 40 lines.
+- **`oha-implementer`** (`.claude/agents/oha-implementer.md`, one per flag, kept alive until the flag is kept or dropped): writes the flagged change in `../oha-wt/<flag>` on branch `wt/<flag>`, passes `check`, hands back the commit and the smoke regexes. The orchestrator runs that worktree's smoke and batches from inside it (`npm run batch` there plays its `bots/`; results still land in the main checkout's `datasets/runs`), merges `wt/<flag>` into `smarter-bot-behaviour` when kept, and removes the worktree either way.
+- Agents report only to the orchestrator; shared state is this file, the state table in the overnight doc and `npm run batch -- ledger`. Two changes in flight at most (two screen batches of 5 games).
+
 ## One round
 
 1. **Diagnose.** Run `npm run diagnose -- <latest complete batches>`. Pick a target that moves the **gold lead** or wins: a mode share, a gold-per-minute gap, a phase where the lead turns. A target that only moves deaths is not enough: `bail`, `yield` and `siegecut` each moved their own death count and gained nothing.

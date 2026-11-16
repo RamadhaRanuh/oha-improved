@@ -39,7 +39,14 @@ const path = require("path");
 const { spawn, spawnSync } = require("child_process");
 
 const root = path.join(__dirname, "../..");
-const runsDir = path.join(root, "datasets/runs");
+// Batches always live in the main checkout's datasets/runs, also when started from an implementer's git
+// worktree (that worktree's bots/ is what the games play), so one ledger lists every batch.
+const mainRoot = (() => {
+    const r = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: root, encoding: "utf8" });
+    const common = (r.stdout || "").trim();
+    return r.status === 0 && common ? path.dirname(path.resolve(common)) : root;
+})();
+const runsDir = path.join(mainRoot, "datasets/runs");
 const fail = msg => {
     console.error(msg);
     process.exit(1);
