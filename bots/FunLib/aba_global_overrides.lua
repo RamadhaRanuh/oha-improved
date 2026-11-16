@@ -84,16 +84,24 @@ function print(...)
 end
 
 local original_GetUnitToUnitDistance = GetUnitToUnitDistance
+-- Flag `fixes`: Valve's VScript has no debug library, so debug.traceback() here raised a second
+-- error and killed the caller's Think. With the flag on, print no trace and return 1000 as intended.
+local function StackTrace()
+	if require( GetScriptDirectory()..'/FunLib/behavior/flags' ).IsOn( 'fixes' ) then
+		return debug and debug.traceback and debug.traceback() or ''
+	end
+	return debug.traceback()
+end
 function GetUnitToUnitDistance(unit1, unit2)
 	if not unit1 then
 		print("[Error] GetUnitToUnitDistance called with invalid unit 1")
-		print("Stack Trace:", debug.traceback())
+		print("Stack Trace:", StackTrace())
 		return 1000
 	end
 	if unit2 == nil or unit2:GetLocation() == nil then
 		if unit1 then
 			print("[Error] GetUnitToUnitDistance called with invalid unit 2, the unit 1 is: " .. unit1:GetUnitName())
-			print("Stack Trace:", debug.traceback())
+			print("Stack Trace:", StackTrace())
 		end
 		return 1000
 	end
@@ -301,7 +309,7 @@ local originalAction_UseAbility = CDOTA_Bot_Script.Action_UseAbility
 function CDOTA_Bot_Script:Action_UseAbility(hAbility)
     if hAbility == nil or hAbility:IsHidden() then
 		print("Action_UseAbility has been called on ability that's hidden")
-		print("Stack Trace:", debug.traceback())
+		print("Stack Trace:", StackTrace())
 		return nil
 	end
     return originalAction_UseAbility(self, hAbility)
@@ -311,7 +319,7 @@ local originalActionPush_UseAbility = CDOTA_Bot_Script.ActionPush_UseAbility
 function CDOTA_Bot_Script:ActionPush_UseAbility(hAbility)
     if hAbility == nil or hAbility:IsHidden() then
 		print("ActionPush_UseAbility has been called on ability that's hidden")
-		print("Stack Trace:", debug.traceback())
+		print("Stack Trace:", StackTrace())
 		return nil
 	end
     return originalActionPush_UseAbility(self, hAbility)
@@ -399,7 +407,7 @@ local originalGetUnitToLocationDistance = CDOTA_Bot_Script.GetUnitToLocationDist
 function CDOTA_Bot_Script:GetUnitToLocationDistance(unit, location)
     if location == nil then
 		print("GetUnitToLocationDistance error arg.")
-		print("Stack Trace:", debug.traceback())
+		print("Stack Trace:", StackTrace())
 		return 200
 	end
     return originalGetUnitToLocationDistance(self, unit, location)
