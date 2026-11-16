@@ -1,14 +1,14 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
-## Current state (updated 2026-11-16 22:25)
+## Current state (updated 2026-11-17 00:23)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
 | Base | `group,fixes` (`fixes` merged e7e8e52 by the user's call: correctness fixes, gold -0.9k inconclusive). Screen baseline for the base: sc-group-fixes; `group` alone: 49/96 over ev-group2/3/4 |
-| In test | `siegeback` full batch (ev-gf-siegeback) vs the full `group,fixes` baseline ev-gf (both running, done about 00:45) |
-| Next | at ~00:45: full batch of the stack (wt/stack 710a8a8: corefarm+siegeback; smoke queued) vs ev-gf, or corefarm alone if siegeback paired wins < 0; in parallel, 32-game screens of the existing flags on group,fixes, `laning` first (never tested past 16 games) |
+| In test | `corefarm` full batch ev-gf-corefarm (from ../oha-wt/corefarm) vs ev-gf; `laning` screen sc-gf-laning vs sc-group-fixes |
+| Next | screens of the other existing flags on group,fixes (fight, retreat, farm, roam, escape, humanfeel, arbiter) as slots free; positive ones (>= +1k) stack with corefarm |
 | Kept so far | `fixes` (by the user's decision, not by a batch) |
 | Removed after a complete batch | `bail`, `yield`, `siegecut` (53ba259), `noregroup` (d301818), `farmfree` (ce70e60) |
 | Parked | `learned` (1 of 6 games) |
@@ -134,3 +134,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **22:25** Gold-gap analyst (by source, 10:00-30:00, MODES lines carry cumulative last hits): corefarm moved +2.1k over 10-30 through last hits at 15-25 (farm share up 9 and 3 points), leaving the mean lead at 30:00 about +0.4k against plain OHA. What remains is variance that snowballs from the early game: games below -3k at 30:00 were already -2.8k at 10:00, games above +3k were +1.9k; death counts 10-30 are even. Remaining farm leak: 25-30 min (corefarm stops at 25:00; team last hits 81 vs 101 per 5 min), about +0.4k if extended. Roshan small and net positive. Decision (mine): the next lever is the early game; the existing `laning` flag (and the other existing flags, never tested past 16 games) get 32-game screens on group,fixes as slots free. Tooling gap noted: no tower-kill or Roshan-kill trace lines.
 - **22:49** Stack smoke (group,fixes,corefarm,siegeback, wt/stack 710a8a8): no errors, 59 COREFARM lines, but no SIEGEBACK line in 43 minutes, so smokecheck said FAIL. Checked: after 35:00 the new team's three pushes all ended on `unseen3`, which by design does not trigger siegeback, and siegeback fires in 17 of the first 21 games of its own batch (236 lines); its hooks are in the stack's group.lua, siege.lua and siegeback.lua. Decision (mine): accept the stack for its full batch; the missing line is this game's situation, not the merge.
 - **23:59** KILLREC confirmed in sc-gf-laning (first batch from main since 0efea79): 89 lines so far, 8 of them Roshan kills, 0 recorder setup failures. ev-gf-siegeback complete (32/32); preview vs the 96 `group` games only (not the verdict, those lack fixes): gold -0.0k, paired wins +2 points (-13 to +17). The verdict waits for ev-gf (24/32).
+- **00:23** `siegeback` DROPPED. ev-gf-siegeback vs ev-gf (full group,fixes baseline), paired over 31 games: gold at 30:00 -1.3k (-4.4k to +1.9k), paired wins -3 points (-22 to +16). Baseline game 24 has no match record: its log stops mid-fight at 40:22 (server died, no bot error), and the batch tool has no single-game rerun, so I judged on the 31 paired games rather than build one now. Decision (mine): both directions negative, so per the plan the stack is not tested; worktrees and branches wt/siegeback and wt/stack deleted (code was never merged). The late-game close-out stays unsolved. Full batch ev-gf-corefarm started from ../oha-wt/corefarm (97a9fc9) to confirm corefarm's +2.7k screen on wins. ev-gf baseline: 17/31 won.
