@@ -110,8 +110,9 @@ if (args[0] === "play") {
 
 const game = Number(args[0]);
 if (!Number.isInteger(game) || game < 1 || game > 32) fail("Usage: npm run match -- <game 1-32> <flag>[,<flag>...]   or   npm run match -- reset");
-const flagsOn = (args[1] || "").split(",").map(s => s.trim()).filter(Boolean);
-if (!flagsOn.length) fail(`Name the flags for the new team, e.g. "arbiter". Known: ${FLAGS.join(", ")}`);
+// "none": every flag off on both teams (plain OHA against plain OHA: the A/A noise check, npm run batch)
+const flagsOn = args[1] === "none" ? [] : (args[1] || "").split(",").map(s => s.trim()).filter(Boolean);
+if (!flagsOn.length && args[1] !== "none") fail(`Name the flags for the new team, e.g. "arbiter". Known: ${FLAGS.join(", ")}`);
 for (const f of flagsOn) if (!FLAGS.includes(f)) fail(`Unknown flag "${f}". Known: ${FLAGS.join(", ")}`);
 
 // Lineups: rows like "| 1 | A | juggernaut | puck | axe | earthshaker | crystal_maiden |"

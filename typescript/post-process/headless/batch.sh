@@ -26,7 +26,8 @@ for g in $(cat "$B/games.txt"); do
   # Claim a free port across every running batch (mkdir is atomic); two servers on one port crash at startup.
   mkdir -p /tmp/oha-ports
   PORT=27201
-  until mkdir "/tmp/oha-ports/$PORT" 2>/dev/null; do PORT=$((PORT + 1)); done
+  # A lock left by a game that died with WSL (no dota2 server holds the port any more) is taken back.
+  until mkdir "/tmp/oha-ports/$PORT" 2>/dev/null || { [ -z "$(pgrep -f -- "-port $PORT( |$)")" ] && [ -n "$(find "/tmp/oha-ports/$PORT" -maxdepth 0 -mmin +2)" ] && touch "/tmp/oha-ports/$PORT"; }; do PORT=$((PORT + 1)); done
   (
     unshare -m bash -c "mount --bind '$G/bots' '$BOTS' && exec bash '$HERE/game.sh' '$G/run' $TS $PORT" > "$G/result.txt" 2>&1
     rmdir "/tmp/oha-ports/$PORT"
