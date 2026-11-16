@@ -38,6 +38,8 @@ local Tower = ____dota.Tower
 local UnitType = ____dota.UnitType
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
 local Utils = require(GetScriptDirectory().."/FunLib/utils")
+local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
+local IsOn = ____flags.IsOn
 function Holding()
     local allies = jmz.GetNumOfAliveHeroes(false)
     local enemies = jmz.GetNumOfAliveHeroes(true)
@@ -85,7 +87,7 @@ function ____exports.HighGroundOpen()
     local allies = jmz.GetNumOfAliveHeroes(false)
     local enemies = jmz.GetNumOfAliveHeroes(true)
     local aegis = jmz.DoesTeamHaveAegis()
-    if allies - enemies >= NUMBERS_LEAD then
+    if allies - enemies >= NUMBERS_LEAD and not IsOn("siegecut") then
         cacheOpen = true
         cacheWhy = (("lead" .. tostring(allies)) .. "v") .. tostring(enemies)
     elseif enemies <= ENEMY_FEW then
