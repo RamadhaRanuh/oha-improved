@@ -4,6 +4,10 @@ local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
 local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
 local bRetreatFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('retreat')
 local bFightFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('fight')
+-- Behaviour flag `yield`: low health and retreat already wanted, retreat outbids the mode holding the bot.
+local bYieldFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('yield')
+local fYieldLogAt = -999
+local fYieldUntil = -1 -- yield holds retreat at 1.0 until then, so the mode it lost to does not take over next frame
 -- Team fight state (behavior/fight): engaged bots only run when about to die; disengage sends all of them.
 local Fight = bFightFlag and require(GetScriptDirectory()..'/FunLib/behavior/fight') or nil
 -- Fight decision log for the learned policy (behavior/decision_log; Customize.DecisionLog), all bots.
@@ -207,6 +211,30 @@ function GetDesire()
         local sForced = DecisionLog.Forced(bot)
         if sForced == 'run' then res = math.max(res, 0.97); sWhy = 'explore_run'
         elseif sForced == 'fight' then res = math.min(res, 0.05); sWhy = 'explore_fight' end
+    end
+    -- Behaviour flag `yield`. In the eval batches the new team died about 12 times per game after 20:00 having
+    -- started its retreat below 40% health; just before, retreat already asked 0.5+ while attack (most often),
+    -- team roam, push or defence held the bot. Below 45% health with retreat at 0.5 or more, retreat bids 1.0
+    -- (the maximum). Not while finishing a hero below 20% health. GetActiveModeDesire() cannot be used to bid
+    -- just above the holding mode: it read 0.000 in attack mode while attack kept beating retreat at 0.90, and
+    -- roam bid 1.0 (smoke games, YIELDCHK lines).
+    if bYieldFlag and bot:IsAlive() and res >= 0.5 and J.GetHP(bot) < 0.45 then
+        local nMode = bot:GetActiveMode()
+        if nMode == BOT_MODE_ATTACK or nMode == BOT_MODE_TEAM_ROAM or nMode == BOT_MODE_ROAM
+        or (nMode >= BOT_MODE_PUSH_TOWER_TOP and nMode <= BOT_MODE_DEFEND_TOWER_BOT) then
+            local hTarget = bot:GetTarget()
+            local bFinishing = hTarget ~= nil and hTarget:IsHero() and J.GetHP(hTarget) < 0.2
+            local nActive = bot:GetActiveModeDesire()
+            if J.Utils.DebugMode and DotaTime() - fYieldLogAt >= 1 then
+                fYieldLogAt = DotaTime()
+                print(string.format('YIELDCHK team=%d hero=%s t=%d mode=%d active=%.3f res=%.3f finishing=%s', GetTeam(), bot:GetUnitName(), math.floor(DotaTime()), nMode, nActive, res, tostring(bFinishing)))
+            end
+            if not bFinishing then
+                res = BOT_MODE_DESIRE_ABSOLUTE; sWhy = 'yield'; fYieldUntil = DotaTime() + 2
+            end
+        elseif nMode == BOT_MODE_RETREAT and DotaTime() < fYieldUntil then
+            res = BOT_MODE_DESIRE_ABSOLUTE; sWhy = 'yield'
+        end
     end
     -- Guard: healed up at the fountain with no enemy near, retreat has nothing left to do. Game 9091079067:
     -- all five Dire bots stood in their fountain in retreat ('formula') for 3-4 game minutes with full health.
