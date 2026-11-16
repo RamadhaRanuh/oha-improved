@@ -1,10 +1,11 @@
 #!/bin/bash
 # One headless Dota game on the Linux build in WSL (docs/specs/learned-fight-decisions.md, step 0).
-# Usage: game.sh <run dir> <timescale> <port>
+# Usage: game.sh <run dir> <timescale> <port> [stop at game seconds]
 # Plays the bot scripts mounted at <dota>/game/dota/scripts/vscripts/bots, loads the match recorder when
 # the pick phase starts, and stops the server once the MATCHREC line is written (or after 40 real minutes).
+# With a stop time (screen batches) it also stops once the trace's game time (POS lines) passes it.
 # Writes console.log and stdout.log into <run dir>.
-R=$1; TS=${2:-8}; PORT=${3:-27015}
+R=$1; TS=${2:-8}; PORT=${3:-27015}; STOP=${4:-0}
 mkdir -p "$R"; rm -f "$R"/console.log "$R"/stdout.log "$R"/stdin
 cd /opt/dota2/game || exit 1
 export LD_LIBRARY_PATH=/opt/dota2/game/bin/linuxsteamrt64:$LD_LIBRARY_PATH
@@ -22,6 +23,10 @@ echo "sv_cheats 1" >&3; echo "script_reload_code bots/tools/match_recorder" >&3
 for i in $(seq 1 2400); do
   grep -aq "MATCHREC {" "$R/console.log" 2>/dev/null && break
   kill -0 $PID 2>/dev/null || break
+  if [ "$STOP" -gt 0 ] && [ $((i % 5)) -eq 0 ]; then
+    T=$(tail -c 30000 "$R/console.log" 2>/dev/null | grep -ao '] POS team=[23] hero=[^ ]* t=[0-9]*' | tail -1 | grep -o '[0-9]*$')
+    [ -n "$T" ] && [ "$T" -ge "$STOP" ] && { echo "stopped at game time $T (screen)"; break; }
+  fi
   sleep 1
 done
 sleep 3; echo "quit" >&3; sleep 5; kill -9 $PID 2>/dev/null

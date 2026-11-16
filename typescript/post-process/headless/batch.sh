@@ -1,14 +1,14 @@
 #!/bin/bash
 # Runs a batch of headless games, at most <parallel> at once (docs/specs/learned-fight-decisions.md, step 2).
 # Started by `npm run batch -- start`; not meant to be run by hand.
-# Usage: batch.sh <batch dir> <parallel> <timescale> <output dir>
+# Usage: batch.sh <batch dir> <parallel> <timescale> <output dir> [stop at game seconds]
 #
 # <batch dir> holds base/ (a copy of the repo's bots folder), cfg/g<n>/ (that game's general.lua and utils.lua
 # from match-setup.js --out) and games.txt (the game numbers). Each game gets its own bots folder, mounted over
 # the game's bots path in a private mount namespace, so games with different settings run side by side.
 # Each finished game's console log is copied to <output dir>/console.g<n>.log; progress goes to
 # <output dir>/status.log and memory use to <output dir>/mem.log.
-B=$1; P=${2:-8}; TS=${3:-8}; OUT=$4
+B=$1; P=${2:-8}; TS=${3:-8}; OUT=$4; STOP=${5:-0}
 BOTS=/opt/dota2/game/dota/scripts/vscripts/bots
 HERE=$(cd "$(dirname "$0")" && pwd)
 log() { echo "$(date +%T) $*" >> "$OUT/status.log"; }
@@ -37,9 +37,14 @@ for g in $(cat "$B/games.txt"); do
     else { [ -z "$(pgrep -f -- "-port $1( |$)")" ] && [ -n "$(find "$L" -maxdepth 0 -mmin +2)" ]; } || return 1; fi
     rm -rf "$L" && mkdir "$L" 2>/dev/null
   }
-  until claim "$PORT"; do PORT=$((PORT + 1)); done
+  # The pool is 10 ports, so 10 games at once across every batch and smoke game (11 crashed a server and
+  # starved Windows). With no port free the game waits for one.
+  until claim "$PORT"; do
+    PORT=$((PORT + 1))
+    if [ "$PORT" -gt 27210 ]; then PORT=27201; sleep 10; fi
+  done
   (
-    unshare -m bash -c "mount --bind '$G/bots' '$BOTS' && exec bash '$HERE/game.sh' '$G/run' $TS $PORT" > "$G/result.txt" 2>&1
+    unshare -m bash -c "mount --bind '$G/bots' '$BOTS' && exec bash '$HERE/game.sh' '$G/run' $TS $PORT $STOP" > "$G/result.txt" 2>&1
     [ "$(cat "/tmp/oha-ports/$PORT/pid" 2>/dev/null)" = "$BASHPID" ] && rm -rf "/tmp/oha-ports/$PORT"   # only our own lock
     cp "$G/run/console.log" "$OUT/console.g$g.log" 2>/dev/null
     rm -rf "$G/bots"

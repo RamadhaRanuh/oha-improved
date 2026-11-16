@@ -2,6 +2,8 @@
 //
 //   npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--name=<name>]
 //   npm run batch -- start <games> <flags> --data [--explore=0.03]   data batch (exploration on)
+//   npm run batch -- start <games> <flags> --screen   screen batch: every game stops at 31:00 game time
+//                                          (about half the time); judged on the gold lead at 30:00 only
 //   npm run batch -- status [<name>]       progress of a batch (default: the newest)
 //   npm run batch -- report [<name>]       result per game, per lineup pair, and the verdict
 //   npm run batch -- compare <a> <b>       win rate of batch a against batch b (b is the baseline; b1+b2 pools baselines)
@@ -85,7 +87,7 @@ else if (cmd === "smoke") smoke(pos[1]);
 else if (cmd === "smokecheck") smokecheck(pos[1]);
 else
     fail(
-        "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03]] [--partial] [--name=]\n" +
+        "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03] | --screen] [--partial] [--name=]\n" +
             "       npm run batch -- status|report [<name>]\n" +
             "       npm run batch -- compare <name> <baseline>[+<baseline>...]\n" +
             "       npm run batch -- stop <name>\n" +
@@ -202,7 +204,10 @@ function start() {
 
     const git = a => (spawnSync("git", a, { cwd: root, encoding: "utf8" }).stdout || "").trim();
     const commit = git(["rev-parse", "--short", "HEAD"]) + (git(["status", "--porcelain", "--", "bots", "typescript/bots"]) ? "+dirty" : "");
+    const screen = opts.screen === true ? 31 * 60 : 0; // stop at 31:00: past the 30:00 sample with room for the 2 s POS cadence
+    if (screen && data) fail("--screen and --data do not mix");
     const manifest = { name, flags, kind: data ? "data" : "eval", commit, parallel, timescale, explore: Number(explore), started: new Date().toISOString(), games: {} };
+    if (screen) manifest.screen = screen;
     for (const g of games) {
         const r = spawnSync(process.execPath, [path.join(__dirname, "match-setup.js"), String(g), flags, `--explore=${explore}`, `--out=${path.join(dir, "cfg", `g${g}`)}`], { encoding: "utf8" });
         if (r.status !== 0) fail(`match-setup failed for game ${g}:\n${r.stderr || r.stdout}`);
@@ -227,7 +232,7 @@ function start() {
             `rsync -a --delete --exclude '*.matchbak' ${sq(repo + "/bots/")} ${B}/base/`,
             `rsync -a ${sq(win + "/cfg/")} ${B}/cfg/`,
             `tr -d '\\r' < ${sq(win + "/games.txt")} > ${B}/games.txt`,
-            `setsid nohup bash ${H}/batch.sh ${B} ${parallel} ${timescale} ${sq(win)} > ${B}/batch.out 2>&1 < /dev/null &`,
+            `setsid nohup bash ${H}/batch.sh ${B} ${parallel} ${timescale} ${sq(win)} ${screen} > ${B}/batch.out 2>&1 < /dev/null &`,
             // Wait until the batch has started its first game: a detached process can die with the WSL session
             // if that session closes too soon (seen when two batches were launched back to back).
             `for i in $(seq 1 30); do [ -d ${B}/g$(head -1 ${B}/games.txt) ] && break; sleep 1; done`,
@@ -242,7 +247,7 @@ function start() {
         windowsHide: true,
     });
     keep.unref();
-    console.log(`Batch ${name} (${manifest.kind}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
+    console.log(`Batch ${name} (${manifest.kind}${screen ? ", screen: stops at 31:00" : ""}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
     console.log(`  Logs: ${path.relative(root, dir)}   Progress: npm run batch -- status   Results: npm run batch -- report`);
 }
 
@@ -289,15 +294,17 @@ function readRec(file) {
     // Team net worth at 30:00 (POS trace lines, Utils.DebugMode), or at the last sample if the game ended sooner.
     const nw = { 2: {}, 3: {} };
     let nw30 = null;
+    let reached30 = false;
     for (const m of text.matchAll(/\] POS team=(\d) hero=(\S+) t=([\d.-]+) .* nw=(\d+)/g)) {
         nw[m[1]][m[2]] = Number(m[4]);
         if (Number(m[3]) >= 30 * 60) {
             nw30 = Sums(nw);
+            reached30 = true;
             break;
         }
     }
     if (nw30 === null && Object.keys(nw[2]).length) nw30 = Sums(nw);
-    return { rec, errors, decisions, d10, nw30 };
+    return { rec, errors, decisions, d10, nw30, reached30 };
 }
 function Sums(nw) {
     const s = t => Object.values(nw[t]).reduce((a, v) => a + v, 0);
@@ -354,11 +361,13 @@ function results(name) {
         const r = readRec(file);
         const nt = info.newTeam === "radiant" ? 2 : 3;
         const lead30 = r.nw30 ? r.nw30[nt] - r.nw30[5 - nt] : null;
-        rows.push({ g, info, state: r.rec ? "done" : "no MATCHREC", ...r, lead30 });
+        // A screen game is stopped at 31:00 without a MATCHREC; it counts once its log reached 30:00.
+        const ok = r.rec || (m.screen && r.reached30);
+        rows.push({ g, info, state: ok ? "done" : "no MATCHREC", ...r, lead30 });
     }
     const done = rows.filter(r => r.state === "done");
-    const won = done.filter(r => r.rec.winner === r.info.newTeam).length;
-    return { m, rows, played: done.length, won, total: rows.length, kind: m.kind || (m.explore > 0 ? "data" : "eval") };
+    const won = done.filter(r => r.rec && r.rec.winner === r.info.newTeam).length;
+    return { m, rows, played: done.length, won, total: rows.length, kind: m.kind || (m.explore > 0 ? "data" : "eval"), screen: !!m.screen };
 }
 
 function report(name) {
@@ -376,6 +385,10 @@ function report(name) {
         }
         if (r.state !== "done") {
             console.log(head + `no MATCHREC (errors ${r.errors})`);
+            continue;
+        }
+        if (!r.rec) {
+            console.log(head + `screened, gold lead at 30:00 ${k1(r.lead30)}`);
             continue;
         }
         const { rec, errors, decisions, d10 } = r;
@@ -399,14 +412,19 @@ function report(name) {
                 `${String(Math.round(rec.duration / 60)).padEnd(9)}${k.padEnd(16)}${nw.padEnd(15)}${lh.padEnd(14)}${`${dNew}-${dOld}`.padEnd(12)}${String(errors).padEnd(8)}${decisions}`
         );
     }
-    console.log(`Per lineup pair: ${Object.entries(pairs).map(([p, v]) => `pair ${p} ${v.w}/${v.n}`).join(", ")}`);
-    console.log(`New team won ${won} of ${played} finished games.`);
-    if (played) console.log(`Average per game: nw10 new-old ${Math.round(sums.nw / played)}, lh10 new-old ${Math.round(sums.lh / played)}, deaths before 10:00 new-old ${(sums.d10 / played).toFixed(1)}`);
+    if (m.screen) console.log(`Screened ${played} of ${total} games (stopped at 31:00).`);
+    else console.log(`Per lineup pair: ${Object.entries(pairs).map(([p, v]) => `pair ${p} ${v.w}/${v.n}`).join(", ")}`);
+    if (!m.screen) console.log(`New team won ${won} of ${played} finished games.`);
+    if (played && !m.screen) console.log(`Average per game: nw10 new-old ${Math.round(sums.nw / played)}, lh10 new-old ${Math.round(sums.lh / played)}, deaths before 10:00 new-old ${(sums.d10 / played).toFixed(1)}`);
     if (!played) return;
     const leads = rows.filter(r => r.state === "done" && r.lead30 !== null).map(r => r.lead30);
     if (leads.length > 1) {
         const [mean, lo30, hi30] = meanCI(leads);
         console.log(`Gold lead at 30:00 (new - old): ${k1(mean)} per game, 95% range ${k1(lo30)} to ${k1(hi30)} (${leads.length} games).`);
+    }
+    if (m.screen) {
+        console.log("Win verdict: none (screen batch: games stop at 31:00). Judge it with compare against a baseline, then confirm a PASS with a full batch.");
+        return;
     }
     const [lo, hi] = wilson(won, played);
     console.log(`Win rate ${pct(won / played)}, 95% range ${pct(lo)}-${pct(hi)}.`);
@@ -429,7 +447,7 @@ function ledger(filter) {
         const gold = leads.length ? k1(leads.reduce((a, x) => a + x, 0) / leads.length) + (leads.length < r.played ? ` (${leads.length} games with POS lines)` : "") : "-";
         const started = String(r.m.started || "").slice(5, 16).replace("T", " ");
         console.log(
-            `${started.padEnd(13)}${n.padEnd(26)}${r.kind.padEnd(6)}${String(r.m.flags).padEnd(30)}${String(r.m.commit || "?").padEnd(14)}` +
+            `${started.padEnd(13)}${n.padEnd(26)}${(r.screen ? "scrn" : r.kind).padEnd(6)}${String(r.m.flags).padEnd(30)}${String(r.m.commit || "?").padEnd(14)}` +
                 `${`${r.played}/${r.total}`.padEnd(8)}${String(r.won).padEnd(7)}${(r.played ? pct(r.won / r.played) : "-").padEnd(7)}${gold}`
         );
     }
@@ -497,6 +515,10 @@ function compare(a, b) {
     if (ga !== gb) console.log("Note: the two batches cover different games (lineups); the difference mixes in lineup effects.");
     if (!A.played || !Bb.played) return;
     goldScreen(a, b, A, Bb);
+    if (A.screen || Bb.screen) {
+        console.log("Win verdict: none (screen batch: games stop at 31:00). On a Gold PASS, confirm with a full eval batch.");
+        return;
+    }
     const pa = A.won / A.played;
     const pb = Bb.won / Bb.played;
     const se = Math.sqrt((pa * (1 - pa)) / A.played + (pb * (1 - pb)) / Bb.played);

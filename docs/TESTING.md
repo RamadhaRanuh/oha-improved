@@ -18,6 +18,7 @@ The **new team** is the flagged team, the **old team** plays plain OHA. Each gam
 
    `smokecheck` exits 2 until the game reaches `--until` minutes, then prints PASS (exit 0) or FAIL (exit 1) and stops the game, so a wait is `until npm run -s batch -- smokecheck <name>; [ $? -ne 2 ]; do sleep 60; done`. It fails on any `BEHAVIOR_ERROR` or runtime error other than the ~20 `error in error handling` lines every game prints (plain OHA too), on a missing `--expect` and on a present `--forbid`. Commit the flag after a PASS.
 5. **Eval batch.** `npm run batch -- start 1-32 <base>,<flag> --parallel=5 --name=ev-<base>-<flag>`, explore 0 (the default). Baseline: reuse the existing batches of `<base>` when the base's code has not changed since they ran (code added behind other, off flags does not count; check the `commit` column of `npm run batch -- ledger`). Otherwise start a fresh baseline at the same time with the same games.
+   **Screen first** (faster): add `--screen` and every game stops at 31:00 game time, about half the real time of a full game. `compare` then gives the Gold verdict only, and a full baseline still pairs with it. Run the full eval batch only for a Gold PASS, to confirm on wins.
 6. **Judge** on complete batches only: `npm run batch -- compare ev-<base>-<flag> <baseline>[+<baseline>...]`.
    - **Gold verdict** first: the paired lead at 30:00, game by game. FAIL drops the flag.
    - PASS: confirm on wins. Keep on a win verdict of BETTER, or on Gold PASS with a win difference that is not negative while more games accumulate.
