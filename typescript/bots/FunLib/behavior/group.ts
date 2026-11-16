@@ -27,6 +27,14 @@
  *   GROUP team=3 t=936 defend lane=top gathered here=2/3
  *   GROUP team=3 t=1200 push lane=mid start why=lead2 ids=...
  *   GROUP team=3 t=1000 regroup start anchor=monkey_king
+ *
+ * Flag `corefarm` (with `group`): before CORE_FARM_UNTIL, cores (pos 1-3) keep farming. They are not
+ * picked for a defence or push whose lane is not theirs and whose point is farther than CORE_NEAR (tier-3
+ * and 4+ enemy defences still take every bot), do not walk back to a regroup rally unless it is such a
+ * push or defence point in their lane or near them, and team roam's help-ally walk ignores allies farther
+ * than CORE_FIGHT_RANGE. All of it is off while an ally within CORE_FIGHT_RANGE is fighting. Cap() leaves a
+ * core's farm alone unless it is picked for a defence or is in a push that has gathered.
+ *   COREFARM team=3 hero=juggernaut t=1100 skip=regroup     (gather|regroup|helpally|cap) once per CORE_LOG_GAP s per bot and kind
  */
 import { BotMode, Lane, Tower, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import * as jmz from "bots/FunLib/jmz_func";
@@ -34,6 +42,7 @@ import * as Utils from "bots/FunLib/utils";
 import * as Brain from "./team_brain";
 import * as Siege from "./siege";
 import { DesireTier } from "./desire_tiers";
+import { IsOn } from "./flags";
 
 const UPDATE = 1;
 // ---- defence (tunable)
@@ -71,6 +80,12 @@ const GROUP_MEMORY = 20;
 const REGROUP_RADIUS = 2500;
 const REGROUP_ARRIVE = 1200;
 const REGROUP_MIN_HP = 0.4;
+// ---- corefarm (tunable)
+const CORE_FARM_UNTIL = 25 * 60;
+const CORE_NEAR = 3000;
+const CORE_FIGHT_RANGE = 1600;
+const CORE_FIGHT_ENEMY = 1200;
+const CORE_LOG_GAP = 20;
 // ---- caps
 const LOW = DesireTier.LOW;
 const CAP_KEEP = 0.9; // a capped mode above this is OHA running away (farm is also its run mode): keep it
@@ -121,6 +136,7 @@ let pushEndedAt = -999;
 let groupSeenAt = -999;
 let regrouping = false;
 let rally: Vector | null = null;
+let rallyLane: Lane | null = null; // lane of the push or defence the rally point belongs to, else null
 let anchorId = -1;
 const enemyDeaths: number[] = [];
 const allyDeaths: number[] = [];
@@ -129,6 +145,7 @@ const allyAlive: Record<number, boolean> = {};
 const moving: Record<number, boolean> = {}; // regroup walk in progress (arrival hysteresis)
 const target: Record<number, Vector> = {};
 const lastMove: Record<number, number> = {};
+const coreLogAt: Record<string, number> = {};
 
 function Dist(a: Vector, b: Vector): number {
     const dx = a.x - b.x;
@@ -148,6 +165,39 @@ function Short(u: Unit): string {
 
 function Log(text: string): void {
     if (Utils.DebugMode) print(`GROUP team=${GetTeam()} t=${Math.floor(DotaTime())} ${text}`);
+}
+
+function CoreLog(bot: Unit, skip: string): void {
+    if (!Utils.DebugMode) return;
+    const key = `${bot.GetPlayerID()}:${skip}`;
+    const now = DotaTime();
+    if (coreLogAt[key] !== undefined && now - coreLogAt[key] < CORE_LOG_GAP) return;
+    coreLogAt[key] = now;
+    print(`COREFARM team=${GetTeam()} hero=${Short(bot)} t=${Math.floor(now)} skip=${skip}`);
+}
+
+/** An allied hero within CORE_FIGHT_RANGE of the bot is fighting: hit by a hero just now with an enemy hero close. */
+function AllyFightNear(bot: Unit): boolean {
+    for (const a of Allies()) {
+        if (a.GetPlayerID() === bot.GetPlayerID() || Dist(a.GetLocation(), bot.GetLocation()) > CORE_FIGHT_RANGE) continue;
+        if (a.WasRecentlyDamagedByAnyHero(2) && jmz.GetEnemiesNearLoc(a.GetLocation(), CORE_FIGHT_ENEMY).length > 0) return true;
+    }
+    return false;
+}
+
+/** Flag `corefarm`: a core bot (pos 1-3) before CORE_FARM_UNTIL. */
+function CoreWindow(bot: Unit): boolean {
+    return IsOn("corefarm") && bot.IsBot() && DotaTime() < CORE_FARM_UNTIL && jmz.GetPosition(bot) <= 3;
+}
+
+/** Flag `corefarm`: a core in its window with no ally fighting near it keeps farming instead of walking to the team. */
+function CoreFree(bot: Unit): boolean {
+    return CoreWindow(bot) && !AllyFightNear(bot);
+}
+
+/** A push or defence target the core may still be pulled to: in its own lane or near it. */
+function CoreNear(bot: Unit, lane: Lane, point: Vector): boolean {
+    return bot.GetAssignedLane() === lane || Dist(bot.GetLocation(), point) <= CORE_NEAR;
 }
 
 /** Living allied heroes, people included (they count as present but are never assigned). */
@@ -311,13 +361,22 @@ function UpdateDefences(now: number): void {
         }
     }
     threats.sort((a, b) => b[1] - a[1]);
-    const bots = Bots().filter(b => jmz.GetHP(b) >= DEFEND_MIN_HP);
+    const healthy = Bots().filter(b => jmz.GetHP(b) >= DEFEND_MIN_HP);
     const taken: Record<number, boolean> = {};
     for (const t of threats) {
         const [lane, enemies, tower, tier] = t;
-        const needed = tier >= 3 || enemies >= 4 ? bots.length : enemies === 1 ? 2 : 3;
-        const old = defences[lane];
+        const all = tier >= 3 || enemies >= 4;
         const loc = tower.GetLocation();
+        // Flag corefarm: a far core outside this lane keeps farming (not for an every-bot defence).
+        const bots = all
+            ? healthy
+            : healthy.filter(b => {
+                if (!CoreFree(b) || CoreNear(b, lane, loc)) return true;
+                CoreLog(b, "gather");
+                return false;
+            });
+        const needed = all ? bots.length : enemies === 1 ? 2 : 3;
+        const old = defences[lane];
         // Keep the earlier picks that can still go, then add the fastest of the rest.
         const keep = old !== undefined ? old.ids.filter(id => !taken[id] && bots.some(b => b.GetPlayerID() === id)) : [];
         const rest = bots.filter(b => !taken[b.GetPlayerID()] && !keep.includes(b.GetPlayerID()));
@@ -459,6 +518,12 @@ function UpdatePush(now: number): void {
     if (lane === null) return;
     const ids = Bots()
         .filter(b => jmz.GetHP(b) >= PUSH_MIN_HP && DefenceOf(b.GetPlayerID()) === null)
+        .filter(b => {
+            // Flag corefarm: a far core outside the push lane keeps farming.
+            if (!CoreFree(b) || CoreNear(b, lane, PushGather(lane))) return true;
+            CoreLog(b, "gather");
+            return false;
+        })
         .map(b => b.GetPlayerID());
     if (ids.length < 2) return;
     push = { lane, ids, since: now, gatherFrom: now, gathered: false, why };
@@ -486,16 +551,24 @@ function UpdateRegroup(now: number): void {
         if (regrouping) Log("regroup end");
         regrouping = false;
         rally = null;
+        rallyLane = null;
         anchorId = -1;
         return;
     }
     let point: Vector | null = null;
+    let pointLane: Lane | null = null;
     let anchor: Unit | null = null;
-    if (push !== null) point = PushGather(push.lane);
+    if (push !== null) {
+        point = PushGather(push.lane);
+        pointLane = push.lane;
+    }
     if (point === null) {
         for (const lane of LANES) {
             const d = defences[lane];
-            if (d !== undefined && (point === null || d.enemies >= 2)) point = d.gather;
+            if (d !== undefined && (point === null || d.enemies >= 2)) {
+                point = d.gather;
+                pointLane = lane;
+            }
         }
     }
     if (point === null) {
@@ -507,6 +580,7 @@ function UpdateRegroup(now: number): void {
     if (regrouping && point === null) Log("regroup end why=no_rally");
     regrouping = point !== null;
     rally = point;
+    rallyLane = pointLane;
     anchorId = anchor !== null ? anchor.GetPlayerID() : -1;
 }
 
@@ -605,6 +679,11 @@ export function RegroupDesire(bot: Unit): number {
     Update();
     if (!bot.IsAlive() || !bot.IsBot() || jmz.GetHP(bot) < REGROUP_MIN_HP) return 0;
     if (!FarFromGroup(bot)) return 0;
+    // Flag corefarm: a core walks back only to a push or defence point in its lane or near it.
+    if (CoreFree(bot) && (rallyLane === null || !CoreNear(bot, rallyLane, rally as Vector))) {
+        CoreLog(bot, "regroup");
+        return 0;
+    }
     target[bot.GetPlayerID()] = rally as Vector;
     return DesireTier.HIGH;
 }
@@ -630,6 +709,25 @@ export function Cap(bot: Unit, mode: BotMode, value: number): number {
     Update();
     if (laning) return value;
     const id = bot.GetPlayerID();
-    const busy = DefenceOf(id) !== null || (push !== null && push.ids.includes(id)) || FarFromGroup(bot);
-    return busy ? LOW : value;
+    const defending = DefenceOf(id) !== null;
+    const member = push !== null && push.ids.includes(id);
+    const busy = defending || member || FarFromGroup(bot);
+    if (!busy) return value;
+    // Flag corefarm: a core's farm is capped only by a defence it was picked for (picks already leave far
+    // cores out) or a push of its that has started; a gathering push or being far from the group does not.
+    if (mode === BotMode.Farm && CoreWindow(bot) && !defending && !(member && push!.gathered)) {
+        CoreLog(bot, "cap");
+        return value;
+    }
+    return LOW;
+}
+
+/**
+ * Flag `corefarm`, for team roam's help-ally walk: a free core ignores a fight farther than
+ * CORE_FIGHT_RANGE (a fight inside that range already makes it not free, see AllyFightNear).
+ */
+export function CoreSkipsHelp(bot: Unit, ally: Unit): boolean {
+    if (!CoreFree(bot) || Dist(bot.GetLocation(), ally.GetLocation()) <= CORE_FIGHT_RANGE) return false;
+    CoreLog(bot, "helpally");
+    return true;
 }

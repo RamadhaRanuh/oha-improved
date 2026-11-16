@@ -401,7 +401,9 @@ function ConsiderHelpAlly()
     and J.GetHP(bot) >= J.GetHP(nClosestAlly)
     and (not J.IsCore(bot) or (J.IsCore(bot) and (not J.IsInLaningPhase() or J.IsInRange(bot, nClosestAlly, 1600))))
     and not J.IsGoingOnSomeone(bot)
-    and not (J.IsRetreating(bot) and nModeDesire > 0.8) then
+    and not (J.IsRetreating(bot) and nModeDesire > 0.8)
+    -- Flag `corefarm`: before 25:00 a core away from any fight ignores allies farther than 1600 (behavior/group).
+    and not (Group ~= nil and SafeCall('group', Group.CoreSkipsHelp, bot, nClosestAlly) == true) then
         local nInRangeAlly = J.GetAlliesNearLoc(nClosestAlly:GetLocation(), 1200)
         local nInRangeEnemy = J.GetEnemiesNearLoc(nClosestAlly:GetLocation(), 1600)
 
