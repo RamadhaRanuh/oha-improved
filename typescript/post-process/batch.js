@@ -496,8 +496,16 @@ function pooled(spec) {
     const flags = new Set(parts.map(p => p.m.flags));
     if (flags.size > 1) fail(`Pooled baselines must share their flags; got ${[...flags].join(" / ")}`);
     const byGame = {};
-    for (const p of parts) for (const r of p.rows) if (r.state === "done" && r.lead30 !== null) (byGame[r.g] = byGame[r.g] || []).push(r.lead30);
-    const rows = Object.entries(byGame).map(([g, v]) => ({ g: Number(g), state: "done", lead30: v.reduce((x, y) => x + y, 0) / v.length }));
+    const winBy = {};
+    for (const p of parts)
+        for (const r of p.rows) {
+            if (r.state !== "done") continue;
+            if (r.lead30 !== null) (byGame[r.g] = byGame[r.g] || []).push(r.lead30);
+            if (r.rec) (winBy[r.g] = winBy[r.g] || []).push(r.rec.winner === r.info.newTeam ? 1 : 0);
+        }
+    const mean = v => v.reduce((x, y) => x + y, 0) / v.length;
+    const gs = new Set([...Object.keys(byGame), ...Object.keys(winBy)]);
+    const rows = [...gs].map(g => ({ g: Number(g), state: "done", lead30: byGame[g] ? mean(byGame[g]) : null, winRate: winBy[g] ? mean(winBy[g]) : null }));
     const games = {};
     for (const p of parts) Object.assign(games, p.m.games);
     return {
@@ -525,6 +533,19 @@ function compare(a, b) {
     if (A.screen || Bb.screen) {
         console.log("Win verdict: none (screen batch: games stop at 31:00). On a Gold PASS, confirm with a full eval batch.");
         return;
+    }
+    // Paired by game number (same lineup, same side): a game's own lineup effect cancels. The method review
+    // of 2026-11-16 found 20 of 32 slots decided by lineup and side, so the unpaired test below is about 9 points blunter.
+    {
+        const winOf = r => (r.winRate !== undefined ? r.winRate : r.rec ? (r.rec.winner === r.info.newTeam ? 1 : 0) : null);
+        const wb = Object.fromEntries(Bb.rows.filter(r => r.state === "done" && winOf(r) !== null).map(r => [r.g, winOf(r)]));
+        const diffs = A.rows.filter(r => r.state === "done" && r.rec && r.g in wb).map(r => winOf(r) - wb[r.g]);
+        if (diffs.length > 1) {
+            const [m, l, h] = meanCI(diffs);
+            const complete = A.played === A.total && Bb.played === Bb.total;
+            console.log(`Wins paired by game over ${diffs.length} games: ${m >= 0 ? "+" : ""}${Math.round(100 * m)} points, 95% range ${Math.round(100 * l)} to ${Math.round(100 * h)}.`);
+            if (complete && A.kind !== "data" && Bb.kind !== "data") console.log(`Paired win verdict: ${l > 0 ? "BETTER" : h < 0 ? "WORSE" : "inconclusive"}.`);
+        }
     }
     const pa = A.won / A.played;
     const pb = Bb.won / Bb.played;
