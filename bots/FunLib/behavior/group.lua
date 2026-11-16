@@ -281,8 +281,6 @@ local Brain = require(GetScriptDirectory().."/FunLib/behavior/team_brain")
 local Siege = require(GetScriptDirectory().."/FunLib/behavior/siege")
 local ____desire_tiers = require(GetScriptDirectory().."/FunLib/behavior/desire_tiers")
 local DesireTier = ____desire_tiers.DesireTier
-local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
-local IsOn = ____flags.IsOn
 function PushGather(lane)
     return GetLaneFrontLocation(
         GetTeam(),
@@ -950,7 +948,7 @@ local function UpdateRegroup(now)
     if EnemyGroupSize() >= ENEMY_GROUP then
         groupSeenAt = now
     end
-    local want = not laning and now - groupSeenAt <= GROUP_MEMORY and not IsOn("noregroup")
+    local want = not laning and now - groupSeenAt <= GROUP_MEMORY
     if not want then
         if regrouping then
             Log("regroup end")
