@@ -11,6 +11,7 @@ Read `docs/TESTING.md` (the round, the API and TSTL traps) and `docs/ARCHITECTUR
 
 - The change sits behind a flag: `IsOn("<flag>")` in the code, the name in `FLAGS` in `typescript/post-process/match-setup.js` and in `FlagName` in `typescript/bots/FunLib/behavior/flags.ts`. With the flag off, behaviour is identical to before.
 - Generated Lua (bots/FunLib/behavior, bots/BotLib, bots/ts_libs and others with a TS source) is changed in the TS source under `typescript/bots`, then `npm run build`. Hand-written Lua (bots/mode_*.lua and others without a TS source) is edited directly.
+- Use absolute worktree paths in every file write. PowerShell's .NET calls (`[IO.File]::WriteAllText` and the like) resolve relative paths against the process directory, which is the main checkout: on 2026-11-16 that edited three main files by mistake.
 - Never touch bots/FretBots, the untracked files in bots/ (bots/API, bots/Buff/Spells.lua and the rest of `git status`'s untracked list), or the Windows Dota client.
 
 ## Steps
