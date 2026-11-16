@@ -1,14 +1,14 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
-## Current state (updated 2026-11-17 00:23)
+## Current state (updated 2026-11-17 01:44)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
 | Base | `group,fixes` (`fixes` merged e7e8e52 by the user's call: correctness fixes, gold -0.9k inconclusive). Screen baseline for the base: sc-group-fixes; `group` alone: 49/96 over ev-group2/3/4 |
-| In test | `corefarm` full batch ev-gf-corefarm (from ../oha-wt/corefarm) vs ev-gf; `laning` screen sc-gf-laning vs sc-group-fixes |
-| Next | screens of the other existing flags on group,fixes (fight, retreat, farm, roam, escape, humanfeel, arbiter) as slots free; positive ones (>= +1k) stack with corefarm |
+| In test | `corefarm` full batch ev-gf-corefarm vs the pool sc-group-fixes+ev-gf; `earlyretreat` screen sc-gf-earlyretreat (wt/earlyretreat b307597) vs the pool |
+| Next | screens of the remaining existing flags vs the pool: retreat, farm, roam, escape, humanfeel, arbiter; candidates (>= +1k vs the pool) stack with corefarm |
 | Kept so far | `fixes` (by the user's decision, not by a batch) |
 | Removed after a complete batch | `bail`, `yield`, `siegecut` (53ba259), `noregroup` (d301818), `farmfree` (ce70e60) |
 | Parked | `learned` (1 of 6 games) |
@@ -139,3 +139,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **00:41** Early-game analyst (ev-gf, sc-group-fixes, sc-gf-laning: 96 games): lead at 10:00 correlates 0.66 with 30:00 and doubles by 30:00 either way; the pooled mean at 10:00 is -0.5k. Before 10:00 the new team runs nearly the same code as old (group is off until 10:00), so much of that is side bias (new dire -1.0k at 10:00, radiant even) and coin-flip mid lanes the snowball amplifies. Named target: early deaths. Heroes keep trading in attack or farm mode with retreat desire 0.90 and switch to retreat only at hp ~0.39, dying 4.9 s later. The `laning` flag runs but makes the early game worse (17.0 vs 20.2 last hits at 10:00 per hero, 7.3 vs 6.1 deaths). Also: identical code gave +0.1k (ev-gf) vs -2.3k (sc-group-fixes) at 30:00, so the corefarm +2.7k screen was against a low baseline draw; judge corefarm against ev-gf and the pooled sc-group-fixes+ev-gf. Decision (mine): an implementer builds `earlyretreat` (before 10:00, hp < 0.55 with 2+ enemies near -> retreat wins). Expected about +0.5k at 10:00, about +1k at 30:00 (estimate).
 - **00:49** `earlyretreat` (wt/earlyretreat b307597): before 10:00, hp < 0.55 with 2+ visible enemy heroes within 1200 -> retreat bids ABSOLUTE*1.6 for 3 s (the early retreat rules topped out at 0.90 while farm's anti-chase run bid ABSOLUTE*1.1, roam 1.0-1.2 and team roam 1.5). Smoke PASS: 20 EARLYRETREAT lines for the new team, none for the old, no errors. Its screen starts when sc-gf-fight completes (2 batches in flight).
 - **01:22** Method check. The two `group,fixes` baselines differ by +2.4k at 30:00 (ev-gf - sc-group-fixes, paired: -0.3k to +5.1k) on identical bot code (ruled out: FretBots is not loaded headless; tracked code never loads the October untracked files, so main and worktree runs play the same code). That is batch noise, as with ev-group2 vs ev-group4 earlier (2.3k). Consequence: corefarm's +2.7k screen was mostly a low baseline draw: vs ev-gf +0.3k, vs the pool sc-group-fixes+ev-gf +1.5k (-1.4k to +4.4k). Rule from now: judge against the pooled baseline. Tooling (batch.js): `compare` prints the paired lead at 10:00 (information only); a game counts for gold once its log passed 30:00 (ev-gf g24 died at 40:22), so ev-gf pools again. laning vs the pool: -1.1k at 30:00, -0.4k at 10:00.
+- **01:44** `fight` screen sc-gf-fight vs the pool sc-group-fixes+ev-gf: gold at 30:00 **-5.9k (-8.3k to -3.5k), Gold FAIL**; at 10:00 -0.7k (-1.2k to -0.1k). It is an original staged flag (S2), so I did not delete its code overnight; recommendation for the user: remove it. sc-gf-earlyretreat started 01:44 from ../oha-wt/earlyretreat.
