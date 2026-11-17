@@ -41,6 +41,33 @@ export function Int(min: number, max: number): number {
     return Math.min(max, min + Math.floor(Next() * (max - min + 1)));
 }
 
+/**
+ * An independent Park-Miller stream from a fixed seed, for reproducible test drafts
+ * (Customize.Draft_Seed in hero_selection.lua). It has its own state: the per-game stream above is untouched.
+ */
+export interface SeededStream {
+    /** Uniform in [0, 1). */
+    Next: (this: void) => number;
+    /** Uniform in [min, max). */
+    Float: (this: void, min: number, max: number) => number;
+    /** Uniform integer in [min, max], both included. */
+    Int: (this: void, min: number, max: number) => number;
+}
+
+export function Seeded(seed: number, salt: number): SeededStream {
+    let s = (Math.abs(Math.floor(seed * 7919 + salt * 104729)) % (MOD - 1)) + 1;
+    for (let i = 0; i < 3; i++) s = (s * MUL) % MOD; // spread close seeds apart
+    const step = (): number => {
+        s = (s * MUL) % MOD;
+        return (s - 1) / (MOD - 1);
+    };
+    return {
+        Next: step,
+        Float: (min: number, max: number): number => min + (max - min) * step(),
+        Int: (min: number, max: number): number => Math.min(max, min + Math.floor(step() * (max - min + 1))),
+    };
+}
+
 /** A vector of length `length` in a random direction (as Valve's RandomVector). */
 export function Direction(length: number): Vector {
     const a = Next() * 2 * Math.PI;

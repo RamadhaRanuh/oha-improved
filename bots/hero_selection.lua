@@ -14,6 +14,59 @@
 
 require( GetScriptDirectory()..'/FunLib/aba_global_overrides' )
 
+--==============================================================================
+-- Reproducible test drafts (docs/TESTING.md, "Drafting changes")
+--   Customize.Draft_Seed = <n> (npm run match -- <game> <flags> --draft): every
+--   random draw this file makes (RandomInt, RandomFloat, math.random, also inside
+--   the modules it calls) comes from a Park-Miller stream seeded with the seed and
+--   the team, so a seed reproduces both teams' drafts. The drafting itself is
+--   plain OHA's. Read from the raw config, even when Customize.Enable is false.
+--   Without a seed, nothing here changes how heroes are picked.
+--==============================================================================
+
+local nDraftSeed = nil
+do
+	local tCustomizeRaw = require( GetScriptDirectory()..'/FunLib/custom_loader' )
+	if type(tCustomizeRaw) == 'table' and tonumber(tCustomizeRaw.Draft_Seed) ~= nil then
+		nDraftSeed = math.floor(tonumber(tCustomizeRaw.Draft_Seed))
+	end
+end
+
+local DraftRng = nil
+local DraftRngSaved = nil
+if nDraftSeed ~= nil then
+	local okRng, Rng = pcall(require, GetScriptDirectory()..'/FunLib/behavior/rng')
+	if okRng and type(Rng) == 'table' and Rng.Seeded then
+		DraftRng = Rng.Seeded(nDraftSeed, GetTeam())
+	end
+end
+
+-- Swap the seeded stream in for the global random functions, and back.
+local function DraftRngOn()
+	if DraftRng == nil or DraftRngSaved ~= nil then return end
+	DraftRngSaved = { RandomInt = RandomInt, RandomFloat = RandomFloat, random = math.random }
+	RandomInt = DraftRng.Int
+	RandomFloat = DraftRng.Float
+	math.random = function(m, n)
+		if m == nil then return DraftRng.Next() end
+		if n == nil then return DraftRng.Int(1, m) end
+		return DraftRng.Int(m, n)
+	end
+end
+
+local function DraftRngOff()
+	if DraftRngSaved == nil then return end
+	RandomInt = DraftRngSaved.RandomInt
+	RandomFloat = DraftRngSaved.RandomFloat
+	math.random = DraftRngSaved.random
+	DraftRngSaved = nil
+end
+
+print('DRAFTFLAG team='..GetTeam()..' seed='..tostring(nDraftSeed or 'none')..(nDraftSeed ~= nil and DraftRng == nil and ' rng=missing' or ''))
+
+-- The module's own setup (pools, preselects, names) draws from the seeded stream too.
+DraftRngOn()
+
 local X = {}
 
 local PickSchedule = {
@@ -713,6 +766,23 @@ local function PickHeroForBotSlot(i, id)
 	return pick
 end
 
+-- Picks made / players still to pick on a team (humans included), from the selection API.
+local function CountTeamPicks(team)
+	local picked, pending = 0, 0
+	for _, id in ipairs(GetTeamPlayers(team, true)) do
+		local h = GetSelectedHeroName(id)
+		if h ~= nil and h ~= '' then picked = picked + 1 else pending = pending + 1 end
+	end
+	return picked, pending
+end
+
+-- Trace only: DRAFTPICK team pos hero t seq (this team's pick number) enemy (enemy picks before it) seed why
+local function PrintDraftPick(i, hero, ownBefore, enemyBefore, why)
+	print('DRAFTPICK team='..GetTeam()..' pos='..tostring(Role.RoleAssignment[sTeamName][i])..' hero='..tostring(hero)
+		..' t='..string.format('%.1f', GameTime())..' seq='..(ownBefore + 1)..' enemy='..enemyBefore
+		..' seed='..tostring(nDraftSeed or 'none')..' why='..why)
+end
+
 local function AllPickHeros()
 	local teamPlayers = GetTeamPlayers(GetTeam(), true)
 
@@ -728,8 +798,11 @@ local function AllPickHeros()
 		and IsPlayerInHeroSelectionControl(id)
 		and GameTime() >= (PickSchedule.NextPickAt[i] or math.huge)
 		then
+			local ownBefore = CountTeamPicks(GetTeam())
+			local enemyBefore = CountTeamPicks(GetOpposingTeam())
 			local finalPick = PickHeroForBotSlot(i, id)
 			SelectHero(id, finalPick)
+			PrintDraftPick(i, finalPick, ownBefore, enemyBefore, 'schedule')
 
 			-- Mark this slot as done so it won’t pick again
 			PickSchedule.NextPickAt[i] = math.huge
@@ -937,7 +1010,7 @@ end
 -- Think loop
 --==============================================================================
 
-function Think()
+local function ThinkBody()
 	if GetGameMode() == GAMEMODE_CM or GetGameMode() == GAMEMODE_REVERSE_CM then
 		CaptainMode.CaptainModeLogic(SupportedHeroes);
 		CaptainMode.AddToList();
@@ -957,6 +1030,16 @@ function Think()
 
 		AllPickHeros()
 	end
+end
+
+function Think()
+	if DraftRng == nil then return ThinkBody() end
+	-- Customize.Draft_Seed: the seeded stream only while this file thinks,
+	-- restored even when ThinkBody errors.
+	DraftRngOn()
+	local ok, err = pcall(ThinkBody)
+	DraftRngOff()
+	if not ok then error(err, 0) end
 end
 
 --==============================================================================
@@ -1120,3 +1203,6 @@ function GetSelectedHumanHero(team)
 		end
 	end
 end
+
+-- End of the module setup: back to the game's random functions (Customize.Draft_Seed).
+DraftRngOff()

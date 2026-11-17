@@ -37,6 +37,28 @@ function ____exports.Int(min, max)
         min + math.floor(Next() * (max - min + 1))
     )
 end
+function ____exports.Seeded(seed, salt)
+    local s = math.abs(math.floor(seed * 7919 + salt * 104729)) % (MOD - 1) + 1
+    do
+        local i = 0
+        while i < 3 do
+            s = s * MUL % MOD
+            i = i + 1
+        end
+    end
+    local function step()
+        s = s * MUL % MOD
+        return (s - 1) / (MOD - 1)
+    end
+    return {
+        Next = step,
+        Float = function(min, max) return min + (max - min) * step() end,
+        Int = function(min, max) return math.min(
+            max,
+            min + math.floor(step() * (max - min + 1))
+        ) end
+    }
+end
 --- A vector of length `length` in a random direction (as Valve's RandomVector).
 function ____exports.Direction(length)
     local a = Next() * 2 * math.pi

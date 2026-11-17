@@ -7,6 +7,10 @@
 //   ... --explore=0.03                           data game: bots sometimes force a random fight / run
 //   ... --out=<dir>                              write general.lua and utils.lua under <dir> (Customize/, FunLib/)
 //                                                instead of editing the repo; no backups (used by npm run batch)
+//   ... --draft                                  free draft: both teams pick their own heroes (all 'Random'), and
+//                                                Customize.Draft_Seed = ceil(game/2) makes both drafts reproducible.
+//                                                The new team is Radiant on odd games and Dire on even games, so each
+//                                                seed is played once from each side. <game> is 1..999 here.
 //
 // Every setup also turns on the fight decision log (Customize.DecisionLog; FIGHTDEC / FIGHTOUT lines,
 // docs/specs/learned-fight-decisions.md), with explore 0 unless --explore is given.
@@ -39,12 +43,15 @@ function fail(msg) {
 const rawArgs = process.argv.slice(2);
 let explore = 0;
 let outDir = null;
+let freeDraft = false;
 const args = rawArgs.filter(a => {
     const m = a.match(/^--explore=([0-9.]+)$/);
     if (m) explore = Number(m[1]);
     const o = a.match(/^--out=(.+)$/);
     if (o) outDir = path.resolve(o[1]);
-    return !m && !o;
+    const d = a === "--draft";
+    if (d) freeDraft = true;
+    return !m && !o && !d;
 });
 // With --out: read the clean file (the backup, if a setup is active in the repo) and write under outDir.
 const readCfg = p => fs.readFileSync(outDir && fs.existsSync(backup(p)) ? backup(p) : p, "utf8");
@@ -109,7 +116,8 @@ if (args[0] === "play") {
 }
 
 const game = Number(args[0]);
-if (!Number.isInteger(game) || game < 1 || game > 32) fail("Usage: npm run match -- <game 1-32> <flag>[,<flag>...]   or   npm run match -- reset");
+const maxGame = freeDraft ? 999 : 32;
+if (!Number.isInteger(game) || game < 1 || game > maxGame) fail(`Usage: npm run match -- <game 1-${maxGame}> <flag>[,<flag>...] [--draft]   or   npm run match -- reset`);
 // "none": every flag off on both teams (plain OHA against plain OHA: the A/A noise check, npm run batch)
 const flagsOn = args[1] === "none" ? [] : (args[1] || "").split(",").map(s => s.trim()).filter(Boolean);
 if (!flagsOn.length && args[1] !== "none") fail(`Name the flags for the new team, e.g. "arbiter". Known: ${FLAGS.join(", ")}`);
@@ -124,13 +132,17 @@ for (const line of fs.readFileSync(lineupsPath, "utf8").split(/\r?\n/)) {
     if (heroes.length === 5) (lineups[m[1]] = lineups[m[1]] || {})[m[2]] = heroes;
 }
 
+// Free draft (--draft): every slot 'Random', so hero_selection drafts for both teams; seed ceil(game/2),
+// new team Radiant on odd games, Dire on even games.
+const FREE = ["Random", "Random", "Random", "Random", "Random"];
+const draftSeed = freeDraft ? Math.ceil(game / 2) : null;
 const pair = Math.ceil(game / 4);
 const rotation = ((game - 1) % 4) + 1;
-const lineup = lineups[pair];
+const lineup = freeDraft ? { A: FREE, B: FREE } : lineups[pair];
 if (!lineup || !lineup.A || !lineup.B) fail(`Pair ${pair} is missing from ${path.relative(root, lineupsPath)}`);
 const radiantSide = rotation === 1 || rotation === 4 ? "A" : "B";
 const direSide = radiantSide === "A" ? "B" : "A";
-const newTeam = rotation === 1 || rotation === 3 ? "Radiant" : "Dire";
+const newTeam = freeDraft ? (game % 2 === 1 ? "Radiant" : "Dire") : rotation === 1 || rotation === 3 ? "Radiant" : "Dire";
 
 keepBackups();
 
@@ -139,7 +151,7 @@ const eol = s => (s.includes("\r\n") ? "\r\n" : "\n");
 let general = readCfg(generalPath);
 const nl = eol(general);
 const heroTable = (name, heroes) =>
-    `Customize.${name} = {${nl}${heroes.map(h => `    'npc_dota_hero_${h}',`).join(nl)}${nl}}`;
+    `Customize.${name} = {${nl}${heroes.map(h => (h === "Random" ? `    'Random',` : `    'npc_dota_hero_${h}',`)).join(nl)}${nl}}`;
 const replaceTable = (text, name, value) => {
     const re = new RegExp(`Customize\\.${name} = \\{[\\s\\S]*?\\n\\}`);
     if (!re.test(text)) fail(`Could not find Customize.${name} in general.lua`);
@@ -153,12 +165,21 @@ general = replaceTable(
     "Behavior",
     `Customize.Behavior = {${nl}    Radiant = { ${flagRow(newTeam === "Radiant")} },${nl}    Dire    = { ${flagRow(newTeam === "Dire")} },${nl}}`
 );
+// Customize.Draft_Seed: set for --draft, removed otherwise (no seed: drafts as before).
+general = general.replace(/\r?\nCustomize\.Draft_Seed = [^\r\n]*/g, "");
+if (draftSeed !== null) general = general.replace(/\r?\nreturn Customize/, `${nl}Customize.Draft_Seed = ${draftSeed}${nl}return Customize`);
 writeCfg(generalPath, withDecisionLog(general));
 
 // utils.lua: DebugMode on, for the thrash counter
 setDebugMode();
 
-console.log(`Game ${game}: pair ${pair}, rotation ${rotation}`);
-console.log(`  Radiant: lineup ${radiantSide}  ${lineup[radiantSide].join(", ")}${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
-console.log(`  Dire:    lineup ${direSide}  ${lineup[direSide].join(", ")}${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
-console.log(`  Debug prints on (thrash counter). Decision log on, explore ${explore}. Check the picks match at the start of the game.`);
+if (freeDraft) {
+    console.log(`Game ${game}: free draft, Draft_Seed ${draftSeed}, new team ${newTeam} (team ${newTeam === "Radiant" ? 2 : 3})`);
+    console.log(`  Radiant: free draft${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : "   (old)"}`);
+    console.log(`  Dire:    free draft${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : "   (old)"}`);
+} else {
+    console.log(`Game ${game}: pair ${pair}, rotation ${rotation}`);
+    console.log(`  Radiant: lineup ${radiantSide}  ${lineup[radiantSide].join(", ")}${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
+    console.log(`  Dire:    lineup ${direSide}  ${lineup[direSide].join(", ")}${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
+}
+console.log(`  Debug prints on (thrash counter). Decision log on, explore ${explore}. ${freeDraft ? "The DRAFTFLAG / DRAFTPICK lines show the draft." : "Check the picks match at the start of the game."}`);
