@@ -82,3 +82,9 @@ Mode numbers: 1 lane, 2 attack, 3 roam, 4 retreat, 7 rune, 8-10 push, 11-13 defe
 - `GetRespawnTime()` needs the dead hero's own unit: bots cannot see enemy respawn times.
 - TypeScript-to-Lua: `(x as any).Method()` compiles to `x.Method()` without `self` (use typed calls; add missing methods to `ts_libs/dota/interfaces.ts`), and `array.length` used as a condition is always true in Lua (compare with `> 0`).
 - `git status` right after a build lists only real changes: the build re-adds files whose only change is line endings (tstl writes LF, `core.autocrlf` checks out CRLF), which stages nothing.
+
+### Tuning thresholds (`--tune`)
+
+`npm run batch -- start <games> <flags> --tune=name=value[,name=value...]` gives the new team other values for numeric thresholds; the old team keeps today's code. Names (defaults): `core_farm_until` (1500 s), `regroup_radius` (2500), `enemy_group` (3), `core_near` (3000), `push_lead` (2), `roshan_first_time` (1200 s), `rosh_kill_time` (90 s). All of them act only when the new team has `group` on (`core_farm_until` also needs `corefarm`).
+- A tune set counts as one change: compare a tuned batch against baselines with the same flags and no tune. Tune several thresholds at once as a bundle when each alone is below a screen's resolution.
+- The trace line `TUNE team=<2|3> name=value ...` prints once per team at game start; smoke with `--expect="TUNE team={new} ..." --forbid="TUNE team={old}"`.
