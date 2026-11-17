@@ -1,19 +1,19 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
-## Current state (updated 2026-11-17 22:20)
+## Current state (updated 2026-11-18 03:45)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
-| Base | `group,fixes,corefarm,roshsafe` (roshsafe v2 merged 5e12242); flags in code: arbiter, group, learned, fixes, corefarm, roshsafe; thresholds tunable with `--tune` |
+| Base | `group,fixes,corefarm,roshsafe,heropick` (heropick merged 909ab2b, acts only in free drafts); flags in code: arbiter, group, learned, fixes, corefarm, roshsafe; thresholds tunable with `--tune` |
 | Baselines | fixed lineups: ev-gfc-roshsafe2 (full, 20/32) + sc-gfcr-base (screen); free drafts: dr-gfcr (15/32) |
-| In test | `heropick` (draft lever): dr-hp vs its same-seed baseline dr-gfcr-b, free drafts, fresh seeds 33-64 (games 65-128) |
-| Next | judge heropick; if kept, refit the rates with the new games and re-test on new seeds |
-| Kept | `fixes` (user), `group`, `corefarm`, `roshsafe` |
+| In test | `herofix` (lone_druid, kez, hoodwink scripts): ev-gfcr-herofix done (+3.0k, inconclusive), replays -b and -c running on the same 16 games |
+| Next | judge herofix on 48 games; fresh fixed-lineup baselines with Weak_Hero_Cap fixed (user decision) |
+| Kept | `fixes` (user), `group`, `corefarm`, `roshsafe`, `heropick` |
 | Removed after a complete batch | `bail`, `yield`, `siegecut`, `noregroup`, `farmfree`, `fight`, `retreat`, `farm`, `escape`, `humanfeel`, `laning`, `roam` |
-| Left off, code kept | `arbiter` (+0.7k, inconclusive), `learned` (parked), draft v1/v2 (wt/draft, wt/draft2, not merged) |
-| Where things stand | base about 57% on fixed lineups (73/127 pooled), 47% in free drafts (15/32); 90% needs about +12.8k at 30:00, every change so far moved under ~2k |
+| Left off, code kept | `arbiter` (+0.7k, inconclusive), `learned` (parked), draft v1/v2 (wt/draft, wt/draft2), `herofix2` (wt/herofix2: PA escape, axe cull; -0.7k, inconclusive) |
+| Where things stand | free drafts: 58/64 = 91% (81-96%) with heropick vs 25/59 for the base on the same seeds; fixed lineups: base about 57% (73/127), herofix leaning positive |
 
 The log below is chronological; the newest entries are at the end.
 
@@ -214,3 +214,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **00:16** Analyst sweep of the fixed-lineup heroes. MEASUREMENT FINDING: hero_selection.lua's Weak_Hero_Cap = 1 (WeakHeroes list: puck, marci, lone_druid, primal_beast, hoodwink, wisp and others; IsWeakHeroOverCap) swaps every second weak hero on a team for a random role-pool hero, silently: 688 of 13590 hero slots (5.1%), 39% of games lose at least one listed hero (2A: wisp gone in 84% of sides; 3A: hoodwink 124/182 or primal_beast; 8B: two of puck/marci/primal_beast). Symmetric between new and old over complete batches (349 vs 339), so gold comparisons stay fair but noisier (which weak hero survives is random per game, so paired games can differ in lineup). MATCHREC lineup does record the real heroes (my 23:50 note was wrong). Decision: no setup change tonight (it would break comparability with every baseline, including the one herofix is judged against); for the user: set Weak_Hero_Cap = 5 in match-setup's fixed-lineup config and start fresh baselines. Script health: no other zero-cast abilities; phantom_assassin dies 10.3 per 35 min vs 4.6-6.1 for other carries (Phantom Strike/Blur almost never in retreat); axe Culling Blade 0.3 casts per game (narrow range/threshold). An implementer writes `herofix2` (PA escape, axe cull) on wt/herofix2 for the next slot. Generic: 76% of all deaths have retreat as the last mode, 46% with at most one ally near.
 - **00:50** herofix2 (wt/herofix2 63343c5) smokes PASS: PA 21 strike/blur lines (smoke-hf2-pa, game 7), axe 18 culls (smoke-hf2-axe, game 1), 0 errors, nothing on the old team. Started ev-gfcr-herofix2: full games on the four pairs with PA or axe on the new team (1-8, 17-20, 25-28, parallel 3). This is a third change in flight against the two-change rule: allowed because heropick is all but decided (34 paired games: +8.3k at 30:00, z 4.30; 32/36 wins vs 11/34) and only waits for completion. herofix 1/3 so far (+4.3k).
 - **02:55** ev-gfcr-herofix COMPLETE (16 games on pairs 2, 3, 5, 6): 10/16 vs the base pool's same games; gold at 30:00 +3.0k (range -0.5k to +6.6k), +0.4k at 10:00, paired wins +13 points (range -14 to +39): inconclusive on both, leaning positive. The mechanisms are real (lone_druid keeps its items, kez and hoodwink escapes fire where they never did), so per the keep rule I add games rather than drop: ev-gfcr-herofix-b replays the same 16 games (parallel 4). herofix2 11/16 (6 wins, -1.7k so far). dr-hp 51/57 (89%), dr-gfcr-b 22/52 (42%).
+- **03:45** dr-hp COMPLETE: **58/64 = 91% (95% range 81-96%), verdict BETTER against 50%**, gold at 30:00 +7.3k (range +5.4k to +9.2k), nw10 +2.3k, lh10 +32, early deaths -1.9; 29 of 32 seeds won from both sides. Same seeds with the base (dr-gfcr-b): 25/59 so far. **heropick KEPT**, merged 909ab2b (build and check ok); BEHAVIOR_CHANGES updated. NEW BASE: `group,fixes,corefarm,roshsafe,heropick`. Caveats: (1) the rates are OHA-vs-OHA; against humans or other drafters the gain is unmeasured; (2) the picks are deterministic per role pool (sniper and jakiro every game), so a human can predict them; (3) refit with `npm run herorates` as data grows. herofix2 COMPLETE: 10/16, gold -0.7k (range -4.2k to +2.8k), wins -6 points: inconclusive, not kept, left on wt/herofix2 for the user. Started ev-gfcr-herofix-c (third run of the herofix games) so herofix gets 48 games.

@@ -28,7 +28,7 @@ Customize.Behavior = {
 
 A missing table or key counts as off.
 
-**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `arbiter` was inconclusive on the base, and `escape`, `humanfeel`, `laning` and `roam` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-18, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe,heropick` (`heropick` acts only in free drafts; fixed lineups skip it). The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `arbiter` was inconclusive on the base, and `escape`, `humanfeel`, `laning` and `roam` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
@@ -40,6 +40,7 @@ A missing table or key counts as off.
 | `fixes` | Bug fixes for the new team (see the commits that added it) | several |
 | `corefarm` | With `group`: cores (pos 1-3) keep farming instead of joining group walks | `behavior/group` |
 | `roshsafe` | Roshan attempts abort when a hero gets low or a hero dies (v2; kept 2026-11-17: 20/32 vs 19/32, Roshan deaths after 30:00 27 to 0) | `behavior/roshsafe`, `mode_roshan_generic.lua` |
+| `heropick` | Free-draft picks: each slot takes the pickable role-pool hero with the highest OHA-vs-OHA win rate (ridge logistic regression over all finished games, `npm run herorates`, table `bots/FunLib/hero_win_rates.lua`); counter/synergy only breaks ties within 0.03 (kept 2026-11-18: dr-hp 58/64 = 91%, range 81-96%, +7.3k at 30:00, on fresh seeds 33-64 not used for the fit) | `hero_selection.lua` (PickByWinRate), `FunLib/hero_win_rates.lua` |
 
 **Tested and removed (2026-11-16, 32-game eval batches against `group`):** `bail` (group roles dropped below 55% health; 13/32 vs 18/32), `yield` (retreat outbids attack and group modes below 45% health; 14/32 vs 15/32), `siegecut` (a hero lead alone no longer opens high ground; 15/32 vs 17/32). How changes are tested and judged: [TESTING.md](TESTING.md).
 
