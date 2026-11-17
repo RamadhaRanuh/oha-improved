@@ -5,6 +5,10 @@
 //   npm run batch -- start <games> <flags> --screen[=<min>]   screen batch: every game stops one minute after
 //                                          <min> (default 30, so 31:00: about half the time); judged on the gold
 //                                          lead at <min>:00 only. --screen=15 for changes that act in the laning phase
+//   npm run batch -- start <games> <flags> --draft   free-draft batch: both teams pick their own heroes
+//                                          (match-setup --draft): game g plays Draft_Seed ceil(g/2), the new team
+//                                          Radiant on odd and Dire on even games. Needs the draft code (wt/draft).
+//                                          Compare only with another --draft batch over the same games.
 //   npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]   early stop for a running batch: stops
 //                                          (with --stop) once its paired gold lead is clearly worse than the
 //                                          baseline's, by an O'Brien-Fleming boundary fixed before the batch
@@ -82,7 +86,13 @@ const manifestOf = name => {
     return JSON.parse(fs.readFileSync(f, "utf8"));
 };
 const screenMinute = m => (m.screen ? Math.floor(m.screen / 60) - 1 : Infinity);
+// A free-draft batch pairs by seed, a fixed-lineup batch by lineup: game g means different heroes in each.
+function sameDraft(names) {
+    if (new Set(names.map(n => !!manifestOf(n).draft)).size > 1)
+        fail(`Do not compare free-draft and fixed-lineup batches: game numbers mean different matches (${names.map(n => `${n} ${manifestOf(n).draft ? "draft" : "lineups"}`).join(", ")}).`);
+}
 function setGoldMinute(names) {
+    sameDraft(names);
     AT = opts.at ? Number(opts.at) : Math.min(30, ...names.map(n => screenMinute(manifestOf(n))));
 }
 const newest = () => {
@@ -114,7 +124,7 @@ else if (cmd === "early") early(pos[1], pos[2]);
 else if (cmd === "rerun") rerun(pos[1], pos[2]);
 else
     fail(
-        "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03] | --screen[=<min>]] [--partial] [--name=]\n" +
+        "Usage: npm run batch -- start <games> <flags|none> [--parallel=8] [--timescale=8] [--data [--explore=0.03] | --screen[=<min>]] [--draft] [--partial] [--name=]\n" +
             "       npm run batch -- status|report [<name>]\n" +
             "       npm run batch -- compare <name> <baseline>[+<baseline>...] [--at=<min>]\n" +
             "       npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]\n" +
@@ -216,7 +226,10 @@ function start() {
     const data = opts.data === true;
     if (opts.explore !== undefined && !data) fail("--explore is for data batches: add --data (eval batches run with explore 0)");
     const explore = data ? String(opts.explore || "0.03") : "0";
-    if (opts.partial !== true) {
+    const draft = opts.draft === true;
+    if (draft && opts.partial !== true && games.some(g => !games.includes(g % 2 ? g + 1 : g - 1)))
+        fail("A --draft batch needs whole seeds: games 2k-1 and 2k play seed k from both sides. Add --partial to run it anyway.");
+    if (!draft && opts.partial !== true) {
         const byPair = {};
         for (const g of games) (byPair[Math.ceil(g / 4)] = byPair[Math.ceil(g / 4)] || []).push(g);
         const broken = Object.entries(byPair).filter(([, gs]) => gs.length !== 4);
@@ -240,18 +253,23 @@ function start() {
     if (screen && data) fail("--screen and --data do not mix");
     const manifest = { name, flags, kind: data ? "data" : "eval", commit, parallel, timescale, explore: Number(explore), started: new Date().toISOString(), games: {} };
     if (screen) manifest.screen = screen;
+    if (draft) manifest.draft = true;
     for (const g of games) {
-        const r = spawnSync(process.execPath, [path.join(__dirname, "match-setup.js"), String(g), flags, `--explore=${explore}`, `--out=${path.join(dir, "cfg", `g${g}`)}`], { encoding: "utf8" });
+        const args = [path.join(__dirname, "match-setup.js"), String(g), flags, `--explore=${explore}`, `--out=${path.join(dir, "cfg", `g${g}`)}`];
+        if (draft) args.push("--draft");
+        const r = spawnSync(process.execPath, args, { encoding: "utf8" });
         if (r.status !== 0) fail(`match-setup failed for game ${g}:\n${r.stderr || r.stdout}`);
+        if (draft && !/free draft, Draft_Seed \d+/.test(r.stdout)) fail(`match-setup did not set up a free draft for game ${g} (is this the draft code?):\n${r.stdout}`);
         const radiantNew = /Radiant:.*<- NEW/.test(r.stdout);
-        const pair = (r.stdout.match(/pair (\d+)/) || [])[1];
+        // In a free draft the "pair" is the seed: games 2k-1 and 2k.
+        const pair = (r.stdout.match(draft ? /Draft_Seed (\d+)/ : /pair (\d+)/) || [])[1];
         manifest.games[g] = { pair: Number(pair), newTeam: radiantNew ? "radiant" : "dire" };
     }
     fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
     fs.writeFileSync(path.join(dir, "games.txt"), games.join("\n") + "\n");
 
     launch(dir, name, "games.txt", parallel, timescale, screen);
-    console.log(`Batch ${name} (${manifest.kind}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
+    console.log(`Batch ${name} (${manifest.kind}${draft ? ", free draft" : ""}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
     console.log(`  Logs: ${path.relative(root, dir)}   Progress: npm run batch -- status   Results: npm run batch -- report`);
 }
 
