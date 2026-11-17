@@ -21,14 +21,14 @@ Flags are set per team in `bots/Customize/general.lua`:
 
 ```lua
 Customize.Behavior = {
-    Radiant = { arbiter = true, laning = true, group = true, roam = true, humanfeel = true, escape = true },
+    Radiant = { arbiter = true, laning = true, group = true, roam = true, humanfeel = true },
     Dire    = { ... },
 }
 ```
 
 A missing table or key counts as off.
 
-**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `laning` and `roam` screened negative on the base, the rest are untested on it. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `laning` and `roam` screened negative on the base and `escape` failed its screen and was removed (below); the rest are untested on it. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
@@ -37,7 +37,6 @@ A missing table or key counts as off.
 | `group` | Team defence assignments, group pushes, regrouping, high-ground gate and Roshan first, no lone trips into danger | `behavior/group`, `behavior/siege`, `behavior/alone` |
 | `roam` | Smoke ganks, counter-gank teleports | `behavior/gank`, `behavior/tpcancel` |
 | `humanfeel` | Varied pre-horn plans (feint, bounty steal, ambush, camp block), per-game randomness | `behavior/prehorn`, `behavior/rng`, `behavior/camps` |
-| `escape` | Retreat route that keeps away from chasing enemies | `behavior/escape` |
 | `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
 | `noregroup` | With `group`: no regroup walk to the rally point (in test) | `behavior/group` |
 | `farmfree` | With `group`: farming is not moved off the enemy half when enemies are missing (in test) | `mode_farm_generic.lua` |
@@ -54,14 +53,16 @@ A missing table or key counts as off.
 
 All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept for the remaining flags: `behavior/tpcancel` (`roam`: counter-gank TPs skip a lost fight; nothing calls its mid-channel cancel now) and the camp list in `behavior/camps` (`humanfeel`: camp block). Sections 3 to 4a below keep their history.
 
+**Tested and removed (2026-11-17, screen `sc-gfcr-escape` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `escape`, Gold FAIL: gold at 30:00 −2.2k (range −4.1k to −0.2k), −2.5k adjusted for the 10:00 lead (+0.2k at 10:00). It walked retreating bots home along a route away from the chasing enemies (a scripted `Think` in `mode_retreat_generic.lua`); without it the engine walks straight to the fountain. Module `behavior/escape`, removed. The fountain guard in retreat (section 4a) now runs for `arbiter` only. Alone against plain OHA it had won 15/31 on 2026-11-16.
+
 ### Match tooling
 
 Run these from `typescript/`:
 
 ```
-npm run match -- play arbiter,laning,group,roam,humanfeel,escape   # human-vs-bot: flags on both teams, debug prints on
-npm run match -- play none                                          # plain OHA baseline
-npm run match -- reset                                              # restore general.lua and utils.lua (do this before committing)
+npm run match -- play arbiter,laning,group,roam,humanfeel   # human-vs-bot: flags on both teams, debug prints on
+npm run match -- play none                                   # plain OHA baseline
+npm run match -- reset                                       # restore general.lua and utils.lua (do this before committing)
 ```
 
 To record a game, load the recorder from the in-game console:
@@ -116,7 +117,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
   - An enemy out of sight counts at 50% of max health or more, never at the health it had when last seen nearly dead.
   - Below 15% health a bot leaves unless it is finishing a kill.
 
-### Retreat (`retreat`, removed 2026-11-17) and escape (`escape`)
+### Retreat (`retreat`) and escape (`escape`), both removed 2026-11-17
 
 - **Fight-aware retreat** (`retreat`):
   - `fight_outnumbered` 0.88;
@@ -225,7 +226,7 @@ With plain OHA on both sides, lineup B beat lineup A 51–3 and 67–13 (games 1
 - **Retreat (all flagged teams):**
   - **The bug:** 9091079067 had all five bots standing in their fountain in retreat mode for 3–4 game minutes at full health. The retreat formula itself was negative there (`RETREATSTUCK` lines), so the cause is elsewhere.
   - **The guard:** at the fountain with health above 90%, mana above 80% and no enemy within 1600, retreat returns 0.
-  - **Scope:** the guard runs only for teams with `arbiter` or `escape` on, so plain OHA is untouched.
+  - **Scope:** the guard runs only for teams with `arbiter` or `escape` on, so plain OHA is untouched (`arbiter` only since `escape` was removed on 2026-11-17).
 
 **Speed:** the Windows client never reached the timescale it was given. Games set to `host_timescale` 4 or 8 ran at 2–3x, because the client renders every tick. Headless Linux games in WSL hold the target (see the spec, step 0).
 
@@ -248,13 +249,12 @@ Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTIN
   | Test | Result |
   |---|---|
   | group | 40/40 |
-  | escape | 21/21 |
   | arbiter | all pass |
   | pull | 34 |
   | prehorn | 76 |
 
 - With debug prints on (`play` turns them on), the console log (`game/dota/console.<matchid>.log`) has one line per decision. Lines start with:
-  - `GROUP`, `ESCAPE`, `SIEGE`, `GANK`, `PREHORN` and `PULL`: one per decision;
+  - `GROUP`, `SIEGE`, `GANK`, `PREHORN` and `PULL`: one per decision;
   - `MODES`: once a minute per bot;
   - `THRASH`: mode-change counts;
   - `DEATH`: the last 8 s of each bot death (health, mode, retreat desire and reason, enemies and allies near).
@@ -269,4 +269,4 @@ Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTIN
 - **Push timing on item and level spikes:** push when key items finish or ultimates come online, and go straight from Roshan to a high-ground push.
 - **Buyback:** save gold for buyback late in the game.
 - **Wave clear when defending:** clear the creep wave with spells from a safe distance.
-- **Smarter escape items:** blinking or forcing along the escape route instead of straight at the ancient.
+- **Smarter escape items:** blinking or forcing away from the chasing enemies instead of straight at the ancient.
