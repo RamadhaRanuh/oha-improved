@@ -1,7 +1,6 @@
 local X = {}
 
 local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
-local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
 -- Fight decision log for the learned policy (behavior/decision_log; Customize.DecisionLog), all bots.
 local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
 if not DecisionLog.Active() then DecisionLog = nil end
@@ -359,10 +358,7 @@ function GetDesireHelper()
         end
     end
 
-    -- Behaviour flag `laning`: during a lane trade burst with health fine, the burst steps back itself;
-    -- this retreat took over after every harass hit.
-    if (J.IsInLaningPhase() or botHP < 0.35)
-    and not (bLaningFlag and (bot.laningHoldUntil ~= nil and DotaTime() < bot.laningHoldUntil) and botHP >= 0.5) then
+    if J.IsInLaningPhase() or botHP < 0.35 then
         local creepDamage = 0
         local nEnemyCreeps = bot:GetNearbyCreeps(1200, true)
         for _, creep in pairs(nEnemyCreeps) do
@@ -636,8 +632,6 @@ function X.ShouldRun()
 		and DotaTime() > 30
 		and DotaTime() < 8 * 60
 		and enemyFountainDistance < 8111
-		-- Behaviour flag `laning`: a lane trade burst is not a chase (same rule as mode_farm_generic).
-		and not (bLaningFlag and (bot.laningHoldUntil ~= nil and DotaTime() < bot.laningHoldUntil))
 	then
 		if botTarget ~= nil and botTarget:IsHero()
 		   and J.GetHP(botTarget) > 0.35

@@ -21,19 +21,18 @@ Flags are set per team in `bots/Customize/general.lua`:
 
 ```lua
 Customize.Behavior = {
-    Radiant = { arbiter = true, laning = true, group = true, roam = true },
+    Radiant = { arbiter = true, group = true, roam = true },
     Dire    = { ... },
 }
 ```
 
 A missing table or key counts as off.
 
-**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `laning` and `roam` screened negative on the base, `arbiter` was inconclusive, and `escape` and `humanfeel` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `roam` screened negative on the base, `arbiter` was inconclusive, and `escape`, `humanfeel` and `laning` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
 | `arbiter` | Desire tiers, a bonus for the running mode (fewer mode flips), mode-change counting | `behavior/arbiter`, `behavior/desire_tiers`, `behavior/thrash` |
-| `laning` | Lane trades, stepping out of harass range, camp pulls, lotus pool pickup | `behavior/laning`, `behavior/pull`, `behavior/lotus` |
 | `group` | Team defence assignments, group pushes, regrouping, high-ground gate and Roshan first, no lone trips into danger | `behavior/group`, `behavior/siege`, `behavior/alone` |
 | `roam` | Smoke ganks, counter-gank teleports | `behavior/gank`, `behavior/tpcancel` |
 | `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
@@ -56,14 +55,16 @@ All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept
 
 **Tested and removed (2026-11-17, screen `sc-gfcr-humanfeel` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `humanfeel`, Gold FAIL: gold at 30:00 −3.3k (range −6.2k to −0.4k), already −0.9k at 10:00 (range −1.6k to −0.2k), so the harm started in the laning phase. It gave each game one pre-horn plan (standard, feint, bounty steal, ambush or camp block) with per-bot spot jitter and timing, through a desire and a scripted `Think` in `mode_rune_generic.lua` before 0:00; without it the rune mode runs as it did with the flag off. Modules `behavior/prehorn` and `behavior/camps` (its only user was the camp block), removed. Kept: `behavior/rng`, the per-game random generator, which `behavior/decision_log` (`learned`) uses for its explore roll. The pre-horn retreat rule in `mode_retreat_generic.lua` (reason `prehorn`) runs for every team and stays. Alone against plain OHA it had won 5/10 on 2026-11-16.
 
+**Tested and removed (2026-11-17, screen `sc-gfcr-laning` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `laning`, Gold FAIL: gold at 10:00 −1.2k (range −1.8k to −0.6k), clearly negative in the laning phase where it acts; −2.1k at 30:00 (range −5.3k to +1.1k). With Valve's laning Think kept, it set a flat laning desire, ran lane trades and step-outs from harass as team-roam bursts, had the supports pull camps and pick lotuses, kept a support helping its core for 3 s in the laning phase, and let the retreat creep-aggro rule, the retreat and farm anti-chase rules and jmz `CheckBotIdleState` skip a bot during a burst (`bot.laningHoldUntil`). Modules `behavior/laning`, `behavior/pull` and `behavior/lotus`, removed; no other flag used them. Without it the laning, team roam, retreat and farm modes run as they did with the flag off. It had been neutral in the bot-vs-bot games of 2026-11-15 (section 4a).
+
 ### Match tooling
 
 Run these from `typescript/`:
 
 ```
-npm run match -- play arbiter,laning,group,roam   # human-vs-bot: flags on both teams, debug prints on
-npm run match -- play none                         # plain OHA baseline
-npm run match -- reset                             # restore general.lua and utils.lua (do this before committing)
+npm run match -- play arbiter,group,roam   # human-vs-bot: flags on both teams, debug prints on
+npm run match -- play none                 # plain OHA baseline
+npm run match -- reset                     # restore general.lua and utils.lua (do this before committing)
 ```
 
 To record a game, load the recorder from the in-game console:
@@ -96,7 +97,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
 - **Incumbent bonus:** the running mode gets +0.12, so it must be clearly beaten before it is replaced. Every mode except retreat is capped at 0.95, just under SURVIVE. Without that cap, a defend mode at FORCED kept bots in place while retreat said "about to die".
 - **Team brain** (`team_brain`): a shared memory of every enemy (last seen spot and time, health, power) for all five bots of a team.
 
-### Laning (`laning`)
+### Laning (`laning`, removed 2026-11-17)
 
 - Valve's own laning Think does the last hitting and denying; it out-farmed a custom one by about 20 last hits by 10:00.
 - What Valve's laning lacks runs as short bursts through team roam: trades when ahead, and stepping out of harass range.
@@ -251,10 +252,9 @@ Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTIN
   |---|---|
   | group | 40/40 |
   | arbiter | all pass |
-  | pull | 34 |
 
 - With debug prints on (`play` turns them on), the console log (`game/dota/console.<matchid>.log`) has one line per decision. Lines start with:
-  - `GROUP`, `SIEGE`, `GANK` and `PULL`: one per decision;
+  - `GROUP`, `SIEGE` and `GANK`: one per decision;
   - `MODES`: once a minute per bot;
   - `THRASH`: mode-change counts;
   - `DEATH`: the last 8 s of each bot death (health, mode, retreat desire and reason, enemies and allies near).

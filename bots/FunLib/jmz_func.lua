@@ -6512,8 +6512,6 @@ function J.CheckBotIdleState()
 
 	local bot = GetBot()
 	if not bot:IsAlive() then return false end
-	-- Behaviour flag `laning`: a bot holding its lane position is not stuck (set by behavior/laning).
-	if bot.laningHoldUntil ~= nil and DotaTime() < bot.laningHoldUntil then return false end
 
 	local botName = bot:GetUnitName();
 	local botId = bot:GetPlayerID();

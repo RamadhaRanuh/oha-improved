@@ -10,7 +10,6 @@ local Customize = require( GetScriptDirectory()..'/Customize/general' )
 local bot = GetBot();
 local X = {}
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func')
-local bLaningFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
 -- Behaviour flag `group`: commit windows at high ground (behavior/siege) and no lone farming in the
 -- enemy half while enemies are missing (behavior/alone).
 local bGroupFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group')
@@ -1012,9 +1011,6 @@ function X.ShouldRun(bot)
 		and DotaTime() > 30
 		and DotaTime() < 8 * 60
 		and enemyFountainDistance < 8111
-		-- Behaviour flag `laning`: a lane trade burst (behavior/laning) is not a chase. Without this, every trade
-		-- handed the bot to this run for 2.88 s (S1 cross-bot game: Juggernaut 51% 'farm' at 1:00-2:00).
-		and not (bLaningFlag and (bot.laningHoldUntil ~= nil and DotaTime() < bot.laningHoldUntil))
 	then
 		if botTarget ~= nil and botTarget:IsHero()
 		   and J.GetHP(botTarget) > 0.35
