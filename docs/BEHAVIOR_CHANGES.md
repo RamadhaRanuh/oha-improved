@@ -21,20 +21,19 @@ Flags are set per team in `bots/Customize/general.lua`:
 
 ```lua
 Customize.Behavior = {
-    Radiant = { arbiter = true, group = true, roam = true },
+    Radiant = { arbiter = true, group = true },
     Dire    = { ... },
 }
 ```
 
 A missing table or key counts as off.
 
-**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `roam` screened negative on the base, `arbiter` was inconclusive, and `escape`, `humanfeel` and `laning` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `arbiter` was inconclusive on the base, and `escape`, `humanfeel`, `laning` and `roam` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
 | `arbiter` | Desire tiers, a bonus for the running mode (fewer mode flips), mode-change counting | `behavior/arbiter`, `behavior/desire_tiers`, `behavior/thrash` |
 | `group` | Team defence assignments, group pushes, regrouping, high-ground gate and Roshan first, no lone trips into danger | `behavior/group`, `behavior/siege`, `behavior/alone` |
-| `roam` | Smoke ganks, counter-gank teleports | `behavior/gank`, `behavior/tpcancel` |
 | `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
 | `noregroup` | With `group`: no regroup walk to the rally point (in test) | `behavior/group` |
 | `farmfree` | With `group`: farming is not moved off the enemy half when enemies are missing (in test) | `mode_farm_generic.lua` |
@@ -49,7 +48,7 @@ A missing table or key counts as off.
 - `retreat` (−3.9k): retreat rules tied to the fight state (`fight_outnumbered`, `fight_disengage`, `fight_survive`, `fight_lane_burst`, `too_deep`), evasive-maneuvers and tower-dive exceptions, and cancelling a TP into a lost fight (item-usage hooks into `behavior/tpcancel`).
 - `farm` (−3.3k): supports stacking camps in the laning phase, and jungling after repeated lane deaths. Module `behavior/jungle`, removed; the stacking part of `behavior/camps`, removed.
 
-All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept for the remaining flags: `behavior/tpcancel` (`roam`: counter-gank TPs skip a lost fight; nothing calls its mid-channel cancel now) and the camp list in `behavior/camps` (`humanfeel`: camp block; removed with `humanfeel`, below). Sections 3 to 4a below keep their history.
+All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept for the remaining flags: `behavior/tpcancel` (`roam`: counter-gank TPs skip a lost fight; removed with `roam`, below) and the camp list in `behavior/camps` (`humanfeel`: camp block; removed with `humanfeel`, below). Sections 3 to 4a below keep their history.
 
 **Tested and removed (2026-11-17, screen `sc-gfcr-escape` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `escape`, Gold FAIL: gold at 30:00 −2.2k (range −4.1k to −0.2k), −2.5k adjusted for the 10:00 lead (+0.2k at 10:00). It walked retreating bots home along a route away from the chasing enemies (a scripted `Think` in `mode_retreat_generic.lua`); without it the engine walks straight to the fountain. Module `behavior/escape`, removed. The fountain guard in retreat (section 4a) now runs for `arbiter` only. Alone against plain OHA it had won 15/31 on 2026-11-16.
 
@@ -57,14 +56,16 @@ All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept
 
 **Tested and removed (2026-11-17, screen `sc-gfcr-laning` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `laning`, Gold FAIL: gold at 10:00 −1.2k (range −1.8k to −0.6k), clearly negative in the laning phase where it acts; −2.1k at 30:00 (range −5.3k to +1.1k). With Valve's laning Think kept, it set a flat laning desire, ran lane trades and step-outs from harass as team-roam bursts, had the supports pull camps and pick lotuses, kept a support helping its core for 3 s in the laning phase, and let the retreat creep-aggro rule, the retreat and farm anti-chase rules and jmz `CheckBotIdleState` skip a bot during a burst (`bot.laningHoldUntil`). Modules `behavior/laning`, `behavior/pull` and `behavior/lotus`, removed; no other flag used them. Without it the laning, team roam, retreat and farm modes run as they did with the flag off. It had been neutral in the bot-vs-bot games of 2026-11-15 (section 4a).
 
+**Tested and removed (2026-11-17, screen `sc-gfcr-roam` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `roam`, Gold FAIL: early-stopped at 30/32 with gold at 30:00 −2.8k (range −4.8k to −0.8k), −0.4k at 10:00, so the harm came after the laning phase, where it acts. It sent a squad to gather, smoke and gank a lone visible enemy away from its towers (10:00 to 40:00), and had a healthy bot with a ready TP join an ally fighting at one of our towers when that evened the numbers (skipping a TP into a lost fight); both ran as desires and scripted `Think`s in `mode_team_roam_generic.lua`. Modules `behavior/gank` and `behavior/tpcancel` (its only user was the counter-gank TP), removed; no other flag used them. Without it team roam runs as it did with the flag off. Alone against plain OHA it had won 3/9 on 2026-11-16, and its earlier screen on `group,fixes,corefarm` was −1.7k (inconclusive).
+
 ### Match tooling
 
 Run these from `typescript/`:
 
 ```
-npm run match -- play arbiter,group,roam   # human-vs-bot: flags on both teams, debug prints on
-npm run match -- play none                 # plain OHA baseline
-npm run match -- reset                     # restore general.lua and utils.lua (do this before committing)
+npm run match -- play arbiter,group   # human-vs-bot: flags on both teams, debug prints on
+npm run match -- play none             # plain OHA baseline
+npm run match -- reset                 # restore general.lua and utils.lua (do this before committing)
 ```
 
 To record a game, load the recorder from the in-game console:
@@ -156,7 +157,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
 - A core that keeps dying in lane may jungle for a while and come back once caught up.
 - Camp lists are refreshed every minute.
 
-### Roam (`roam`)
+### Roam (`roam`, removed 2026-11-17)
 
 - **Smoke gank:** a squad gathers, smokes, and goes for a lone visible enemy away from its towers.
 - **Counter-gank TP:** a healthy bot with a ready TP joins an ally fighting at one of our towers, when that evens the numbers.
@@ -254,7 +255,7 @@ Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTIN
   | arbiter | all pass |
 
 - With debug prints on (`play` turns them on), the console log (`game/dota/console.<matchid>.log`) has one line per decision. Lines start with:
-  - `GROUP`, `SIEGE` and `GANK`: one per decision;
+  - `GROUP` and `SIEGE`: one per decision;
   - `MODES`: once a minute per bot;
   - `THRASH`: mode-change counts;
   - `DEATH`: the last 8 s of each bot death (health, mode, retreat desire and reason, enemies and allies near).
