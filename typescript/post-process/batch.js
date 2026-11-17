@@ -7,7 +7,7 @@
 //                                          lead at <min>:00 only. --screen=15 for changes that act in the laning phase
 //   npm run batch -- start <games> <flags> --draft   free-draft batch: both teams pick their own heroes
 //                                          (match-setup --draft): game g plays Draft_Seed ceil(g/2), the new team
-//                                          Radiant on odd and Dire on even games. Needs the draft code (wt/draft).
+//                                          Radiant on odd and Dire on even games (any checkout: Draft_Seed is on main).
 //                                          Compare only with another --draft batch over the same games.
 //   npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]   early stop for a running batch: stops
 //                                          (with --stop) once its paired gold lead is clearly worse than the
