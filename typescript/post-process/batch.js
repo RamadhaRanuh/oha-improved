@@ -91,8 +91,28 @@ function sameDraft(names) {
     if (new Set(names.map(n => !!manifestOf(n).draft)).size > 1)
         fail(`Do not compare free-draft and fixed-lineup batches: game numbers mean different matches (${names.map(n => `${n} ${manifestOf(n).draft ? "draft" : "lineups"}`).join(", ")}).`);
 }
+// A change is judged against a baseline of its own flags minus the one under test. On 2026-11-17 a day of screens
+// on group,fixes,corefarm,roshsafe was judged against a group,fixes,corefarm pool, and identical code has drifted
+// 2.4k between batches, about the size of the effects. --mismatch compares anyway (e.g. testing the base minus a flag).
+const flagSet = m => new Set(String(m.flags || "").split(",").filter(f => f && f !== "none"));
+const flagKey = s => [...s].sort().join(",") || "none";
+function sameBase(a, bases) {
+    const fa = flagSet(manifestOf(a));
+    const fbs = bases.map(b => flagSet(manifestOf(b)));
+    const problems = [];
+    if (new Set(fbs.map(flagKey)).size > 1) problems.push(`the pooled baselines have different flags (${bases.map((b, i) => `${b}: ${flagKey(fbs[i])}`).join("; ")})`);
+    const added = [...fa].filter(f => !fbs[0].has(f));
+    const missing = [...fbs[0]].filter(f => !fa.has(f));
+    if (added.length > 1 || missing.length)
+        problems.push(`${a} (${flagKey(fa)}) is not its baseline (${flagKey(fbs[0])}) plus one flag: added ${added.join(",") || "none"}, missing ${missing.join(",") || "none"}`);
+    if (!problems.length) return;
+    const msg = `Baseline mismatch: ${problems.join("; ")}. The result would mix in other flags and batch drift. Use a baseline with ${a}'s flags minus the one under test, or add --mismatch to compare anyway.`;
+    if (opts.mismatch === true) console.log(`WARNING ${msg}`);
+    else fail(msg);
+}
 function setGoldMinute(names) {
     sameDraft(names);
+    if (names.length > 1) sameBase(names[0], names.slice(1));
     AT = opts.at ? Number(opts.at) : Math.min(30, ...names.map(n => screenMinute(manifestOf(n))));
 }
 const newest = () => {
@@ -279,10 +299,13 @@ function start() {
 
 // Copies the repo's bots folder and the batch's cfg into WSL and starts headless/batch.sh for the games in
 // <gamesFile> (in the batch folder). <runName> is the WSL run folder: the batch's name, or <name>-r<game> for a rerun.
-function launch(dir, runName, gamesFile, parallel, timescale, screen) {
+// bots/ is copied into the run at launch, so games never read the checkout: merging while a batch runs is safe.
+// baseFrom: a WSL folder to copy bots/ from instead of the checkout (a rerun replays its batch's own copy).
+function launch(dir, runName, gamesFile, parallel, timescale, screen, baseFrom) {
     const repo = toWsl(root);
     const win = toWsl(dir);
     const B = `/opt/oha-runs/${runName}`;
+    const botsSrc = baseFrom ? `${baseFrom}/` : repo + "/bots/";
     const H = `${B}/scripts`; // per batch: rewriting a script a running batch is reading would break it
     const r = wslScript(
         dir,
@@ -291,7 +314,7 @@ function launch(dir, runName, gamesFile, parallel, timescale, screen) {
             "set -e",
             `mkdir -p ${B} ${H}`,
             `for f in game.sh batch.sh; do tr -d '\\r' < ${sq(repo)}/typescript/post-process/headless/$f > ${H}/$f; done`,
-            `rsync -a --delete --exclude '*.matchbak' ${sq(repo + "/bots/")} ${B}/base/`,
+            `rsync -a --delete --exclude '*.matchbak' ${sq(botsSrc)} ${B}/base/`,
             `rsync -a ${sq(win + "/cfg/")} ${B}/cfg/`,
             `tr -d '\\r' < ${sq(win + "/" + gamesFile)} > ${B}/games.txt`,
             `setsid nohup bash ${H}/batch.sh ${B} ${parallel} ${timescale} ${sq(win)} ${screen} > ${B}/batch.out 2>&1 < /dev/null &`,
@@ -323,15 +346,23 @@ function rerun(name, game) {
     if (!fs.existsSync(path.join(dir, "cfg", `g${game}`))) fail(`No cfg/g${game} in ${name}`);
     const log = path.join(dir, `console.g${game}.log`);
     if (fs.existsSync(log) && readRec(log).rec && opts.force !== true) fail(`Game ${game} of ${name} has a match record; nothing to rerun (--force to replay anyway)`);
-    const commit = String(m.commit || "").replace("+dirty", "");
-    const d = spawnSync("git", ["diff", "--stat", commit, "--", "bots", ":(exclude)bots/FretBots"], { cwd: root, encoding: "utf8" }); // FretBots is not loaded in headless games
-    if (d.status !== 0) fail(`Cannot compare bots/ with the batch's commit ${commit}:\n${d.stderr}`);
-    if (d.stdout.trim() && opts.force !== true)
-        fail(`bots/ differs from ${name}'s commit ${commit}, so the rerun would play other code:\n${d.stdout.trim().split("\n").slice(-12).join("\n")}\nRun it from a checkout of ${commit}, or add --force when the difference is behind flags this batch does not use.`);
+    // Replay the batch's own copy of bots/ when it is still in WSL; only without it fall back to the checkout,
+    // which must then match the batch's commit.
+    const snap = `/opt/oha-runs/${name}/base`;
+    const hasSnap = wslScript(dir, "snapcheck.sh", `[ -f ${snap}/hero_selection.lua ] && echo yes || echo no`).out.includes("yes");
+    let note = " (from the batch's own copy of bots/)";
+    if (!hasSnap) {
+        const commit = String(m.commit || "").replace("+dirty", "");
+        const d = spawnSync("git", ["diff", "--stat", commit, "--", "bots", ":(exclude)bots/FretBots"], { cwd: root, encoding: "utf8" }); // FretBots is not loaded in headless games
+        if (d.status !== 0) fail(`Cannot compare bots/ with the batch's commit ${commit}:\n${d.stderr}`);
+        if (d.stdout.trim() && opts.force !== true)
+            fail(`The batch's copy of bots/ (${snap}) is gone and bots/ differs from ${name}'s commit ${commit}, so the rerun would play other code:\n${d.stdout.trim().split("\n").slice(-12).join("\n")}\nRun it from a checkout of ${commit}, or add --force when the difference is behind flags this batch does not use.`);
+        note = d.stdout.trim() ? " (--force: bots/ differs from the batch's commit)" : " (from the checkout, which matches the batch's commit)";
+    }
     if (fs.existsSync(log)) fs.renameSync(log, path.join(dir, `console.g${game}.dead.log`));
     fs.writeFileSync(path.join(dir, `rerun.g${game}.txt`), `${game}\n`);
-    launch(dir, `${name}-r${game}`, `rerun.g${game}.txt`, 1, m.timescale || 8, m.screen || 0);
-    fs.appendFileSync(path.join(dir, "status.log"), `${new Date().toTimeString().slice(0, 8)} rerun of g${game} started${d.stdout.trim() ? " (--force: bots/ differs from the batch's commit)" : ""}\n`);
+    launch(dir, `${name}-r${game}`, `rerun.g${game}.txt`, 1, m.timescale || 8, m.screen || 0, hasSnap ? snap : undefined);
+    fs.appendFileSync(path.join(dir, "status.log"), `${new Date().toTimeString().slice(0, 8)} rerun of g${game} started${note}\n`);
     console.log(`Rerun of ${name} g${game} started; its log lands as console.g${game}.log (old one kept as console.g${game}.dead.log).`);
 }
 
