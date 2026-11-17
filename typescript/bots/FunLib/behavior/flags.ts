@@ -8,7 +8,7 @@
 import Customize = require("bots/Customize/general");
 import { Team } from "bots/ts_libs/dota";
 
-export type FlagName = "arbiter" | "laning" | "group" | "roam" | "learned" | "fixes" | "corefarm" | "roshsafe";
+export type FlagName = "arbiter" | "group" | "roam" | "learned" | "fixes" | "corefarm" | "roshsafe";
 
 // Flags do not change during a game, so each is read once. Keyed by team as well as name,
 // because Phase 0 (check P0-2) has not yet shown whether the two teams share Lua state.

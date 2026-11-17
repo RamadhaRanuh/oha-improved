@@ -43,9 +43,6 @@ export interface Unit {
     DefendLaneDesire: number[] | null;
     laneToDefend: Lane;
     stateTetheredHero: Unit | null;
-    /** Set by behavior/laning during a lane trade/step-out burst: until this DotaTime, jmz CheckBotIdleState
-     * leaves the bot alone and the retreat/farm "should run" rules do not read the trade as a chase. */
-    laningHoldUntil: number | null;
 
     IsNull(): boolean;
 

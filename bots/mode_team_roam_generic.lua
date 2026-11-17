@@ -11,14 +11,6 @@ local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
 local Item = require(GetScriptDirectory()..'/FunLib/aba_item')
 local Roles = require(GetScriptDirectory()..'/FunLib/aba_role')
 local AttackSpecialUnit = dofile(GetScriptDirectory()..'/FunLib/aba_special_units')
--- Behaviour flag `laning`: during the laning phase, laning owns last hits (spec 5.5).
-local bLaningOwnsCreeps = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('laning')
--- Lane trade / step-out bursts (behavior/laning): team roam runs them so Valve's laning Think can keep laning.
-local Laning = bLaningOwnsCreeps and require(GetScriptDirectory()..'/FunLib/behavior/laning') or nil
-local bLaneBurst = false
--- Lotus pool pickup (behavior/lotus): Valve's lotus pool mode never ran in our games.
-local Lotus = bLaningOwnsCreeps and require(GetScriptDirectory()..'/FunLib/behavior/lotus') or nil
-local bLotus = false
 
 -- Smoke ganks and counter-gank TPs (behavior/gank, flag `roam`).
 local Flags = require(GetScriptDirectory()..'/FunLib/behavior/flags')
@@ -42,9 +34,6 @@ local function SafeCall(sName, fn, ...)
 	end
 	return nil
 end
-
-local HELP_CORE_DWELL = 3
-local helpCoreUntil, helpCoreTarget = -999, nil
 
 local X = {}
 local team = GetTeam()
@@ -148,8 +137,6 @@ function GetDesireHelper()
     end
 
     ItemOpsDesire()
-    bLaneBurst = false
-    bLotus = false
     sHumanMode = nil
     -- Debug: which part of team roam bid, read by the DEATH trail in mode_retreat_generic.lua.
     bot.roamSub = 'other'
@@ -166,17 +153,6 @@ function GetDesireHelper()
 
     local target
     target, ShouldHelpWhenCoreIsTargeted = X.ConsiderHelpWhenCoreIsTargeted()
-    -- Behaviour flag `laning`: in the laning phase, keep helping the core for HELP_CORE_DWELL s once started.
-    -- Lane harass toggles the trigger every few seconds; without the dwell supports flipped laning <-> team roam
-    -- 20+ times a minute (S1 playtest 3).
-    if bLaningOwnsCreeps and J.IsInLaningPhase() then
-        if ShouldHelpWhenCoreIsTargeted then
-            helpCoreUntil, helpCoreTarget = DotaTime() + HELP_CORE_DWELL, target
-        elseif DotaTime() < helpCoreUntil and J.IsValidHero(helpCoreTarget) and J.CanBeAttacked(helpCoreTarget)
-        and GetUnitToUnitDistance(bot, helpCoreTarget) <= 1600 then
-            target, ShouldHelpWhenCoreIsTargeted = helpCoreTarget, true
-        end
-    end
     if ShouldHelpWhenCoreIsTargeted then
         SetStickyTarget(target)
         targetUnit = target
@@ -219,26 +195,8 @@ function GetDesireHelper()
 			return nRegroup
 		end
 	end
-	-- A camp pull already under way finishes first (test 9089581778: lotus trips kept pulling CM off pulls).
-	if Lotus ~= nil and not (J.IsInLaningPhase() and Laning.PullActive(bot)) then
-		local nLotus = Lotus.Desire(bot)
-		if nLotus > 0 then
-			bLotus = true
-			bot.roamSub = 'lotus'
-			return nLotus
-		end
-	end
 
 	hTargetCreep = X.GetLastHitCreep()
-	if bLaningOwnsCreeps and J.IsInLaningPhase() then
-		hTargetCreep = nil
-		local nBurst = Laning.BurstDesire(bot)
-		if nBurst > 0 then
-			bLaneBurst = true
-			bot.roamSub = 'burst'
-			return nBurst
-		end
-	end
 	if J.IsValid(hTargetCreep) and J.CanBeAttacked(hTargetCreep) then
 		bot.roamSub = 'lasthit'
 		return 1.5
@@ -424,14 +382,6 @@ function Think()
 	end
 	if sHumanMode == 'group' then
 		SafeCall('group', Group.Think, bot)
-		return
-	end
-	if bLaneBurst then
-		Laning.BurstThink(bot)
-		return
-	end
-	if bLotus then
-		Lotus.Think(bot)
 		return
 	end
 	-- diabled think less to avoid failing to last hit
