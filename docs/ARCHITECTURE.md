@@ -490,9 +490,7 @@ Some Lua files in `bots/FunLib/` are **generated from TypeScript** via TSTL. Whe
 | `FunLib/behavior/group.lua` | `typescript/bots/FunLib/behavior/group.ts` |
 | `FunLib/behavior/lotus.lua` | `typescript/bots/FunLib/behavior/lotus.ts` |
 | `FunLib/behavior/siege.lua` | `typescript/bots/FunLib/behavior/siege.ts` |
-| `FunLib/behavior/prehorn.lua` | `typescript/bots/FunLib/behavior/prehorn.ts` |
 | `FunLib/behavior/alone.lua` | `typescript/bots/FunLib/behavior/alone.ts` |
-| `FunLib/behavior/camps.lua` | `typescript/bots/FunLib/behavior/camps.ts` |
 | `FunLib/behavior/gank.lua` | `typescript/bots/FunLib/behavior/gank.ts` |
 | `FunLib/behavior/tpcancel.lua` | `typescript/bots/FunLib/behavior/tpcancel.ts` |
 

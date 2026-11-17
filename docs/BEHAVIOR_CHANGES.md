@@ -21,14 +21,14 @@ Flags are set per team in `bots/Customize/general.lua`:
 
 ```lua
 Customize.Behavior = {
-    Radiant = { arbiter = true, laning = true, group = true, roam = true, humanfeel = true },
+    Radiant = { arbiter = true, laning = true, group = true, roam = true },
     Dire    = { ... },
 }
 ```
 
 A missing table or key counts as off.
 
-**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `laning` and `roam` screened negative on the base and `escape` failed its screen and was removed (below); the rest are untested on it. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `laning` and `roam` screened negative on the base, `arbiter` was inconclusive, and `escape` and `humanfeel` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
@@ -36,7 +36,6 @@ A missing table or key counts as off.
 | `laning` | Lane trades, stepping out of harass range, camp pulls, lotus pool pickup | `behavior/laning`, `behavior/pull`, `behavior/lotus` |
 | `group` | Team defence assignments, group pushes, regrouping, high-ground gate and Roshan first, no lone trips into danger | `behavior/group`, `behavior/siege`, `behavior/alone` |
 | `roam` | Smoke ganks, counter-gank teleports | `behavior/gank`, `behavior/tpcancel` |
-| `humanfeel` | Varied pre-horn plans (feint, bounty steal, ambush, camp block), per-game randomness | `behavior/prehorn`, `behavior/rng`, `behavior/camps` |
 | `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
 | `noregroup` | With `group`: no regroup walk to the rally point (in test) | `behavior/group` |
 | `farmfree` | With `group`: farming is not moved off the enemy half when enemies are missing (in test) | `mode_farm_generic.lua` |
@@ -51,18 +50,20 @@ A missing table or key counts as off.
 - `retreat` (−3.9k): retreat rules tied to the fight state (`fight_outnumbered`, `fight_disengage`, `fight_survive`, `fight_lane_burst`, `too_deep`), evasive-maneuvers and tower-dive exceptions, and cancelling a TP into a lost fight (item-usage hooks into `behavior/tpcancel`).
 - `farm` (−3.3k): supports stacking camps in the laning phase, and jungling after repeated lane deaths. Module `behavior/jungle`, removed; the stacking part of `behavior/camps`, removed.
 
-All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept for the remaining flags: `behavior/tpcancel` (`roam`: counter-gank TPs skip a lost fight; nothing calls its mid-channel cancel now) and the camp list in `behavior/camps` (`humanfeel`: camp block). Sections 3 to 4a below keep their history.
+All three had already lost the bot-vs-bot games of 2026-11-15 (section 4a). Kept for the remaining flags: `behavior/tpcancel` (`roam`: counter-gank TPs skip a lost fight; nothing calls its mid-channel cancel now) and the camp list in `behavior/camps` (`humanfeel`: camp block; removed with `humanfeel`, below). Sections 3 to 4a below keep their history.
 
 **Tested and removed (2026-11-17, screen `sc-gfcr-escape` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `escape`, Gold FAIL: gold at 30:00 −2.2k (range −4.1k to −0.2k), −2.5k adjusted for the 10:00 lead (+0.2k at 10:00). It walked retreating bots home along a route away from the chasing enemies (a scripted `Think` in `mode_retreat_generic.lua`); without it the engine walks straight to the fountain. Module `behavior/escape`, removed. The fountain guard in retreat (section 4a) now runs for `arbiter` only. Alone against plain OHA it had won 15/31 on 2026-11-16.
+
+**Tested and removed (2026-11-17, screen `sc-gfcr-humanfeel` on the base `group,fixes,corefarm,roshsafe` against the pooled baseline):** `humanfeel`, Gold FAIL: gold at 30:00 −3.3k (range −6.2k to −0.4k), already −0.9k at 10:00 (range −1.6k to −0.2k), so the harm started in the laning phase. It gave each game one pre-horn plan (standard, feint, bounty steal, ambush or camp block) with per-bot spot jitter and timing, through a desire and a scripted `Think` in `mode_rune_generic.lua` before 0:00; without it the rune mode runs as it did with the flag off. Modules `behavior/prehorn` and `behavior/camps` (its only user was the camp block), removed. Kept: `behavior/rng`, the per-game random generator, which `behavior/decision_log` (`learned`) uses for its explore roll. The pre-horn retreat rule in `mode_retreat_generic.lua` (reason `prehorn`) runs for every team and stays. Alone against plain OHA it had won 5/10 on 2026-11-16.
 
 ### Match tooling
 
 Run these from `typescript/`:
 
 ```
-npm run match -- play arbiter,laning,group,roam,humanfeel   # human-vs-bot: flags on both teams, debug prints on
-npm run match -- play none                                   # plain OHA baseline
-npm run match -- reset                                       # restore general.lua and utils.lua (do this before committing)
+npm run match -- play arbiter,laning,group,roam   # human-vs-bot: flags on both teams, debug prints on
+npm run match -- play none                         # plain OHA baseline
+npm run match -- reset                             # restore general.lua and utils.lua (do this before committing)
 ```
 
 To record a game, load the recorder from the in-game console:
@@ -159,7 +160,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
 - **Smoke gank:** a squad gathers, smokes, and goes for a lone visible enemy away from its towers.
 - **Counter-gank TP:** a healthy bot with a ready TP joins an ally fighting at one of our towers, when that evens the numbers.
 
-### Human feel (`humanfeel`)
+### Human feel (`humanfeel`, removed 2026-11-17)
 
 - **Pre-horn plans:** one plan per game, with per-bot spot jitter and timing:
   - standard;
@@ -167,7 +168,7 @@ All modules are TypeScript in `typescript/bots/FunLib/behavior/`, compiled to Lu
   - bounty steal;
   - ambush;
   - camp block (sentry or body block).
-- **Per-game randomness** (`behavior/rng`): a Park-Miller generator seeded from real time. Valve's `RandomFloat` gave the same sequence every game, so the same plan came up every time.
+- **Per-game randomness** (`behavior/rng`): a Park-Miller generator seeded from real time. Valve's `RandomFloat` gave the same sequence every game, so the same plan came up every time. Kept for `learned`.
 
 ## 4. Fixes from human-vs-bot playtests (latest round)
 
@@ -251,10 +252,9 @@ Headless bot-vs-bot testing, the trace lines and how a change is judged: [TESTIN
   | group | 40/40 |
   | arbiter | all pass |
   | pull | 34 |
-  | prehorn | 76 |
 
 - With debug prints on (`play` turns them on), the console log (`game/dota/console.<matchid>.log`) has one line per decision. Lines start with:
-  - `GROUP`, `SIEGE`, `GANK`, `PREHORN` and `PULL`: one per decision;
+  - `GROUP`, `SIEGE`, `GANK` and `PULL`: one per decision;
   - `MODES`: once a minute per bot;
   - `THRASH`: mode-change counts;
   - `DEATH`: the last 8 s of each bot death (health, mode, retreat desire and reason, enemies and allies near).
