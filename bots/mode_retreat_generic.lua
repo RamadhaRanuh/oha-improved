@@ -25,7 +25,7 @@ local bot = GetBot()
 local botHP, botMP, botName, botHealth, botHealthRegen, botManaRegen, botLocation, botTarget
 local botLevel, botActiveMode
 local fStuckLogAt = -99
-local bFountainGuard = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('arbiter') or require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('escape')
+local bFountainGuard = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('arbiter')
 local nAllyHeroes, nEnemyHeroes
 
 local fRetreatFromTormentorTime = 0
@@ -200,7 +200,7 @@ function GetDesire()
     -- Guard: healed up at the fountain with no enemy near, retreat has nothing left to do. Game 9091079067:
     -- all five Dire bots stood in their fountain in retreat ('formula') for 3-4 game minutes with full health.
     -- RETREATSTUCK prints what retreat asked for there (Utils.DebugMode), to find the cause.
-    -- Only for teams with a behaviour flag that can hold retreat (arbiter, escape): plain OHA stays as it was.
+    -- Only for teams with a behaviour flag that can hold retreat (arbiter): plain OHA stays as it was.
     if bFountainGuard and bot:IsAlive() and bot:GetActiveMode() == BOT_MODE_RETREAT and bot:DistanceFromFountain() < 1500
     and J.GetHP(bot) > 0.9 and J.GetMP(bot) > 0.8 and #J.GetEnemiesNearLoc(bot:GetLocation(), 1600) == 0 then
         if J.Utils.DebugMode and DotaTime() - fStuckLogAt >= 5 then
@@ -883,18 +883,6 @@ function X.ConsiderCompleteItem()
         end
     end
     return 0
-end
-
--- Behaviour flag `escape` (behavior/escape): walk a route home that keeps away from the chasing enemies.
--- Flag off: no Think here, so the engine's default retreat (straight to the fountain) runs as before.
-if require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('escape') then
-	local Escape = require(GetScriptDirectory()..'/FunLib/behavior/escape')
-	function Think()
-		local ok = SafeCall('escape', Escape.Think, bot)
-		if ok == nil and not J.CanNotUseAction(bot) and bot:GetCurrentActionType() ~= BOT_ACTION_TYPE_MOVE_TO then
-			bot:Action_MoveToLocation(J.GetTeamFountain())
-		end
-	end
 end
 
 -- Behaviour flag `arbiter` (docs/specs/smarter-bot-behaviour.md 3.2). Flag off: GetDesire stays the function above.
