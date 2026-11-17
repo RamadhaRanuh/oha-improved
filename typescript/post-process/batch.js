@@ -204,7 +204,11 @@ function smokecheck(name) {
         process.exit(2);
     }
     console.log(`Smoke verdict: ${ok ? "PASS" : "FAIL"}`);
-    if (!ended && opts.keep !== true) stop(name);
+    if (!ended && opts.keep !== true) {
+        stop(name);
+        // Keep the log of the stopped game here: once stopped, batch.sh never copies it out of WSL.
+        if (!fs.existsSync(local)) fs.writeFileSync(path.join(dir, `console.g${sm.game}.smoke.log`), text);
+    }
     process.exit(ok ? 0 : 1);
 }
 
