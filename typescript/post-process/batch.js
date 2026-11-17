@@ -363,7 +363,8 @@ function early(name, base) {
     const worse = z < -bound;
     console.log(`${name} vs ${base}: gold lead at ${AT}:00 paired over ${n} of ${A.total} games: ${k1(mean)} (z ${z.toFixed(2)}; stop boundary -${bound.toFixed(2)}).`);
     console.log(worse ? "Early verdict: STOP, clearly worse (Gold FAIL)." : z > bound ? "Early verdict: clearly better so far; let it finish (compare judges it)." : "Early verdict: continue.");
-    if (worse && opts.stop === true && !opts.upto) {
+    // Only a batch with games still to play is stopped; a complete one is judged by compare.
+    if (worse && opts.stop === true && !opts.upto && A.rows.some(r => r.state === "not finished")) {
         stop(name);
         fs.appendFileSync(path.join(runsDir, name, "status.log"), `${new Date().toTimeString().slice(0, 8)} early stop: ${k1(mean)} at ${AT}:00 over ${n} games, z ${z.toFixed(2)} < -${bound.toFixed(2)}\n`);
     }
