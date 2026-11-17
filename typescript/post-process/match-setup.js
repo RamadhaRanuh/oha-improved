@@ -11,6 +11,10 @@
 //                                                Customize.Draft_Seed = ceil(game/2) makes both drafts reproducible.
 //                                                The new team is Radiant on odd games and Dire on even games, so each
 //                                                seed is played once from each side. <game> is 1..999 here.
+//   ... --tune=name=value[,name=value...]        numeric thresholds for the new team only (play: both teams):
+//                                                Customize.Behavior.<team>.tune = { name = value, ... }, read by
+//                                                Tune() in flags.ts. Names must be in TUNES. The first summary line
+//                                                ends with " tune=name=value,..." (absent without --tune).
 //
 // Every setup also turns on the fight decision log (Customize.DecisionLog; FIGHTDEC / FIGHTOUT lines,
 // docs/specs/learned-fight-decisions.md), with explore 0 unless --explore is given.
@@ -33,6 +37,8 @@ const generalPath = path.join(root, "bots/Customize/general.lua");
 const utilsPath = path.join(root, "bots/FunLib/utils.lua");
 const lineupsPath = path.join(root, "docs/specs/measurement-lineups.md");
 const FLAGS = ["arbiter", "group", "learned", "fixes", "corefarm", "roshsafe"];
+// Tune() names (TuneName in typescript/bots/FunLib/behavior/flags.ts; npm run check keeps them equal).
+const TUNES = [];
 const backup = p => p + ".matchbak";
 
 function fail(msg) {
@@ -44,7 +50,13 @@ const rawArgs = process.argv.slice(2);
 let explore = 0;
 let outDir = null;
 let freeDraft = false;
+let tuneArg = null;
 const args = rawArgs.filter(a => {
+    const t = a.match(/^--tune=(.*)$/);
+    if (t) {
+        tuneArg = t[1];
+        return false;
+    }
     const m = a.match(/^--explore=([0-9.]+)$/);
     if (m) explore = Number(m[1]);
     const o = a.match(/^--out=(.+)$/);
@@ -65,6 +77,24 @@ const keepBackups = () => {
     for (const p of [generalPath, utilsPath]) if (!fs.existsSync(backup(p))) fs.copyFileSync(p, backup(p));
 };
 if (!(explore >= 0 && explore <= 1)) fail("--explore must be between 0 and 1");
+// --tune=name=value[,...]: [[name, value]] in the given order, every name in TUNES, every value a finite number.
+const tunes = [];
+if (tuneArg !== null) {
+    const known = `Known: ${TUNES.length ? TUNES.join(", ") : "(none yet)"}`;
+    for (const part of tuneArg.split(",").map(s => s.trim()).filter(Boolean)) {
+        const m = part.match(/^([a-z0-9_]+)=(.+)$/);
+        if (!m) fail(`--tune: "${part}" is not name=value`);
+        if (!TUNES.includes(m[1])) fail(`--tune: unknown name "${m[1]}". ${known}`);
+        if (tunes.some(([n]) => n === m[1])) fail(`--tune: "${m[1]}" given twice`);
+        const v = Number(m[2]);
+        if (m[2].trim() === "" || !Number.isFinite(v)) fail(`--tune: "${m[1]}" needs a finite number, got "${m[2]}"`);
+        tunes.push([m[1], v]);
+    }
+    if (!tunes.length) fail(`--tune needs at least one name=value. ${known}`);
+}
+// Lua for the tune table inside a team's Behavior row, and the summary text.
+const tuneLua = tunes.length ? `, tune = { ${tunes.map(([n, v]) => `${n} = ${String(v)}`).join(", ")} }` : "";
+const tuneText = tunes.length ? ` tune=${tunes.map(([n, v]) => `${n}=${String(v)}`).join(",")}` : "";
 // Customize.DecisionLog: logging on for every match setup.
 const withDecisionLog = text => {
     const re = /Customize\.DecisionLog = \{[^}]*\}/;
@@ -104,13 +134,13 @@ if (args[0] === "play") {
     keepBackups();
     let text = readCfg(generalPath);
     const nl = text.includes("\r\n") ? "\r\n" : "\n";
-    const row = FLAGS.map(f => `${f} = ${on.includes(f)}`).join(", ");
+    const row = FLAGS.map(f => `${f} = ${on.includes(f)}`).join(", ") + tuneLua;
     const re = /Customize\.Behavior = \{[\s\S]*?\n\}/;
     if (!re.test(text)) fail("Could not find Customize.Behavior in general.lua");
     text = text.replace(re, `Customize.Behavior = {${nl}    Radiant = { ${row} },${nl}    Dire    = { ${row} },${nl}}`);
     writeCfg(generalPath, withDecisionLog(text));
     setDebugMode();
-    console.log(`Play setup: flags on both teams (${on.length ? on.join(", ") : "none: baseline OHA"}); heroes as in general.lua. Debug prints on.`);
+    console.log(`Play setup: flags on both teams (${on.length ? on.join(", ") : "none: baseline OHA"}); heroes as in general.lua. Debug prints on.${tuneText}`);
     console.log("When done: npm run match -- reset");
     process.exit(0);
 }
@@ -157,7 +187,8 @@ const replaceTable = (text, name, value) => {
     if (!re.test(text)) fail(`Could not find Customize.${name} in general.lua`);
     return text.replace(re, value);
 };
-const flagRow = on => FLAGS.map(f => `${f} = ${on && flagsOn.includes(f)}`).join(", ");
+// The tune table goes in the new team's row only: the old team plays today's constants.
+const flagRow = on => FLAGS.map(f => `${f} = ${on && flagsOn.includes(f)}`).join(", ") + (on ? tuneLua : "");
 general = replaceTable(general, "Radiant_Heros", heroTable("Radiant_Heros", lineup[radiantSide]));
 general = replaceTable(general, "Dire_Heros", heroTable("Dire_Heros", lineup[direSide]));
 general = replaceTable(
@@ -174,11 +205,11 @@ writeCfg(generalPath, withDecisionLog(general));
 setDebugMode();
 
 if (freeDraft) {
-    console.log(`Game ${game}: free draft, Draft_Seed ${draftSeed}, new team ${newTeam} (team ${newTeam === "Radiant" ? 2 : 3})`);
+    console.log(`Game ${game}: free draft, Draft_Seed ${draftSeed}, new team ${newTeam} (team ${newTeam === "Radiant" ? 2 : 3})${tuneText}`);
     console.log(`  Radiant: free draft${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : "   (old)"}`);
     console.log(`  Dire:    free draft${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : "   (old)"}`);
 } else {
-    console.log(`Game ${game}: pair ${pair}, rotation ${rotation}`);
+    console.log(`Game ${game}: pair ${pair}, rotation ${rotation}${tuneText}`);
     console.log(`  Radiant: lineup ${radiantSide}  ${lineup[radiantSide].join(", ")}${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
     console.log(`  Dire:    lineup ${direSide}  ${lineup[direSide].join(", ")}${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
 }
