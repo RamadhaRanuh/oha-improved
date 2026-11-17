@@ -40,7 +40,14 @@ export function IsOn(name: FlagName): boolean {
  * Trace, once per team per game, on the first Tune read of a team that has a tune table:
  *   TUNE team=2 name=value name=value
  */
-export type TuneName = never;
+export type TuneName =
+    | "core_farm_until"
+    | "regroup_radius"
+    | "enemy_group"
+    | "core_near"
+    | "push_lead"
+    | "roshan_first_time"
+    | "rosh_kill_time";
 
 const tuneCache: Record<string, number> = {};
 const tuneLogged: Record<number, boolean> = {};
@@ -78,4 +85,16 @@ export function Tune(name: TuneName, def: number): number {
     }
     tuneCache[key] = value;
     return value;
+}
+
+/**
+ * A Tune value as a getter that reads it once, on its first call, for sites that run every frame.
+ * Module-level is per team: each team has its own Lua state (Phase 0 check P0-2).
+ */
+export function Tuned(name: TuneName, def: number): () => number {
+    let value: number | undefined;
+    return () => {
+        if (value === undefined) value = Tune(name, def);
+        return value;
+    };
 }

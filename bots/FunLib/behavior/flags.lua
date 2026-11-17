@@ -73,7 +73,7 @@ local function LogTune(team, tune)
 end
 function ____exports.Tune(name, def)
     local team = GetTeam()
-    local key = (tostring(team) .. ":") .. tostring(name)
+    local key = (tostring(team) .. ":") .. name
     local cached = tuneCache[key]
     if cached ~= nil then
         return cached
@@ -91,5 +91,16 @@ function ____exports.Tune(name, def)
     end
     tuneCache[key] = value
     return value
+end
+--- A Tune value as a getter that reads it once, on its first call, for sites that run every frame.
+-- Module-level is per team: each team has its own Lua state (Phase 0 check P0-2).
+function ____exports.Tuned(name, def)
+    local value
+    return function()
+        if value == nil then
+            value = ____exports.Tune(name, def)
+        end
+        return value
+    end
 end
 return ____exports

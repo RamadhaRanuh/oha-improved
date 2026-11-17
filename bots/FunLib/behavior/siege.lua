@@ -38,12 +38,14 @@ local Tower = ____dota.Tower
 local UnitType = ____dota.UnitType
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
 local Utils = require(GetScriptDirectory().."/FunLib/utils")
+local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
+local Tuned = ____flags.Tuned
 function Holding()
     local allies = jmz.GetNumOfAliveHeroes(false)
     local enemies = jmz.GetNumOfAliveHeroes(true)
     return allies - enemies >= HOLD_LEAD or enemies <= ENEMY_FEW or jmz.DoesTeamHaveAegis() and allies >= enemies
 end
-local ROSHAN_FIRST_TIME = 20 * 60
+local ROSHAN_FIRST_TIME = Tuned("roshan_first_time", 20 * 60)
 local NUMBERS_LEAD = 2
 ENEMY_FEW = 2
 local T1 = {[Lane.Top] = Tower.Top1, [Lane.Mid] = Tower.Mid1, [Lane.Bot] = Tower.Bot1}
@@ -110,7 +112,7 @@ function ____exports.PushBlocked(lane)
 end
 --- Take Roshan before going up: see the module comment.
 function ____exports.RoshanFirst()
-    if DotaTime() < ROSHAN_FIRST_TIME or not ____exports.AnyLaneAtHighGround() then
+    if DotaTime() < ROSHAN_FIRST_TIME() or not ____exports.AnyLaneAtHighGround() then
         return false
     end
     if ____exports.HighGroundOpen()[1] or jmz.DoesTeamHaveAegis() or not jmz.IsRoshanAlive() then

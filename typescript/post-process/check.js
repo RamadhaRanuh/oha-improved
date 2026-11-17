@@ -56,7 +56,7 @@ if (rawRequires > 5) failures.push(`... and ${rawRequires - 5} more files with r
     for (const n of typed) if (!listed.has(n)) failures.push(`Flag "${n}" is in FlagName (flags.ts) but missing from FLAGS in match-setup.js`);
 }
 
-// 5. Tune names agree the same way: every Tune("x", ...) is in match-setup.js TUNES and in the TuneName type,
+// 5. Tune names agree the same way: every Tune("x", ...) or Tuned("x", ...) is in match-setup.js TUNES and in the TuneName type,
 //    every listed name is read somewhere, and the two lists are equal.
 {
     const setup = fs.readFileSync(path.join(root, "typescript/post-process/match-setup.js"), "utf8");
@@ -68,7 +68,7 @@ if (rawRequires > 5) failures.push(`... and ${rawRequires - 5} more files with r
     if (!typeMatch) failures.push("TuneName type not found in flags.ts");
     const typed = new Set([...((typeMatch || [, ""])[1].matchAll(/"([a-z0-9_]+)"/g))].map(m => m[1]));
     const used = new Set();
-    for (const f of luaFiles) for (const m of fs.readFileSync(f, "utf8").matchAll(/\bTune\(\s*["']([a-z0-9_]+)["']/g)) used.add(m[1]);
+    for (const f of luaFiles) for (const m of fs.readFileSync(f, "utf8").matchAll(/\bTuned?\(\s*["']([a-z0-9_]+)["']/g)) used.add(m[1]);
     for (const n of used) {
         if (!listed.has(n)) failures.push(`Tune "${n}" is read with Tune but missing from TUNES in match-setup.js (it can never be set)`);
         if (!typed.has(n)) failures.push(`Tune "${n}" is read with Tune but missing from TuneName in flags.ts`);

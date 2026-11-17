@@ -28,8 +28,9 @@
 import { Barracks, Lane, Tower, Unit, UnitType, Vector } from "bots/ts_libs/dota";
 import * as jmz from "bots/FunLib/jmz_func";
 import * as Utils from "bots/FunLib/utils";
+import { Tuned } from "./flags";
 
-const ROSHAN_FIRST_TIME = 20 * 60; // tunable
+const ROSHAN_FIRST_TIME = Tuned("roshan_first_time", 20 * 60); // --tune roshan_first_time
 const NUMBERS_LEAD = 2; // allies alive minus enemies alive needed to siege without the Aegis (tunable)
 const ENEMY_FEW = 2; // or the enemy has at most this many alive
 
@@ -94,7 +95,7 @@ export function PushBlocked(lane: Lane): boolean {
 
 /** Take Roshan before going up: see the module comment. */
 export function RoshanFirst(): boolean {
-    if (DotaTime() < ROSHAN_FIRST_TIME || !AnyLaneAtHighGround()) return false;
+    if (DotaTime() < ROSHAN_FIRST_TIME() || !AnyLaneAtHighGround()) return false;
     if (HighGroundOpen()[0] || jmz.DoesTeamHaveAegis() || !jmz.IsRoshanAlive()) return false;
     return jmz.GetNumOfAliveHeroes(false) >= jmz.GetNumOfAliveHeroes(true);
 }
