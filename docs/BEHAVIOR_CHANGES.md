@@ -28,7 +28,7 @@ Customize.Behavior = {
 
 A missing table or key counts as off.
 
-**Recommended set (bot-vs-bot results, section 4a):** `arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-17, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe`. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `laning` and `roam` screened negative on the base, the rest are untested on it. The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|
@@ -41,6 +41,9 @@ A missing table or key counts as off.
 | `learned` | Learned fight/run policy acting on fight calls after 10:00 (parked: lost 1 of 6) | `behavior/decision_log` |
 | `noregroup` | With `group`: no regroup walk to the rally point (in test) | `behavior/group` |
 | `farmfree` | With `group`: farming is not moved off the enemy half when enemies are missing (in test) | `mode_farm_generic.lua` |
+| `fixes` | Bug fixes for the new team (see the commits that added it) | several |
+| `corefarm` | With `group`: cores (pos 1-3) keep farming instead of joining group walks | `behavior/group` |
+| `roshsafe` | Roshan attempts abort when a hero gets low or a hero dies (v2; kept 2026-11-17: 20/32 vs 19/32, Roshan deaths after 30:00 27 to 0) | `behavior/roshsafe`, `mode_roshan_generic.lua` |
 
 **Tested and removed (2026-11-16, 32-game eval batches against `group`):** `bail` (group roles dropped below 55% health; 13/32 vs 18/32), `yield` (retreat outbids attack and group modes below 45% health; 14/32 vs 15/32), `siegecut` (a hero lead alone no longer opens high ground; 15/32 vs 17/32). How changes are tested and judged: [TESTING.md](TESTING.md).
 

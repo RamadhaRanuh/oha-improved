@@ -7,6 +7,12 @@ local Customize = require( GetScriptDirectory()..'/Customize/general' )
 -- Behaviour flag `group`: Roshan before a high-ground push the numbers do not allow (behavior/siege).
 local bGroupFlag = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group')
 local Siege = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/siege') or nil
+-- Behaviour flag `roshsafe`: no Roshan bid at low hp, team abort after deaths at the pit (behavior/roshsafe).
+local bRoshSafe = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('roshsafe')
+local RoshSafe = bRoshSafe and require(GetScriptDirectory()..'/FunLib/behavior/roshsafe') or nil
+-- Own Roshan handle for roshsafe, refreshed when the old one died (`Roshan` below is found once and never again).
+local RoshSafeUnit = nil
+local fRoshSafeSearch = -999
 
 local killTime = 0.0
 local shouldKillRoshan = false
@@ -25,6 +31,16 @@ local Roshan
 
 function GetDesire()
 	local res = GetDesireHelper()
+	if bRoshSafe then
+		if (RoshSafeUnit == nil or not J.Utils.IsValidUnit(RoshSafeUnit)) and DotaTime() - fRoshSafeSearch > 0.5 then
+			fRoshSafeSearch = DotaTime()
+			RoshSafeUnit = nil
+			for _, c in pairs(bot:GetNearbyNeutralCreeps(700)) do
+				if c:GetUnitName() == "npc_dota_roshan" then RoshSafeUnit = c end
+			end
+		end
+		res = RoshSafe.Filter(bot, res, RoshSafeUnit)
+	end
 	if res > 0.6 then J.ModeAnnounce(bot, 'say_roshan', 30) end
 	return res
 end
