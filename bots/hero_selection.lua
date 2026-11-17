@@ -174,6 +174,17 @@ local okMatchupLib, HeroMatchups = pcall(require, GetScriptDirectory()..'/FunLib
 if not okMatchupLib then HeroMatchups = nil end
 HeroPositionMap = HeroPositionMap.GetHeroPositions()
 
+-- Flag `heropick` (per team): pick the role candidate OHA bots win with most, from
+-- FunLib/hero_win_rates.lua (npm run herorates). Off: nothing below reads the table.
+local tHeroWinRates = nil
+do
+	local okFlags, Flags = pcall(require, GetScriptDirectory()..'/FunLib/behavior/flags')
+	if okFlags and type(Flags) == 'table' and Flags.IsOn and Flags.IsOn('heropick') == true then
+		local okRates, Rates = pcall(require, GetScriptDirectory()..'/FunLib/hero_win_rates')
+		tHeroWinRates = (okRates and type(Rates) == 'table') and Rates or {}
+	end
+end
+
 if GAMEMODE_TURBO == nil then GAMEMODE_TURBO = 23 end
 
 --==============================================================================
@@ -817,6 +828,35 @@ local function SelectTopWithFuzz(scored)
 	return scored[1].name
 end
 
+-- Flag `heropick`: the win rate decides, the counter/synergy score only breaks near-ties.
+-- `scored` is ScoreCandidatesForTeam's list (pickable role-pool heroes, best score first).
+-- Heroes the enemy already picked are left out (the engine refuses them). Draws nothing
+-- from the random streams. Returns the hero, its rate and the candidate count.
+local HEROPICK_TIE = 0.03
+local function PickByWinRate(scored, enemyNames)
+	local enemy = {}
+	for _, e in ipairs(enemyNames) do enemy[e] = true end
+	local cands, good = {}, 0
+	for _, c in ipairs(scored) do
+		if not enemy[c.name] then
+			local rate = tonumber(tHeroWinRates[c.name]) or 0.5
+			table.insert(cands, { name = c.name, rate = rate })
+			if rate >= 0.5 then good = good + 1 end
+		end
+	end
+	if #cands == 0 then return nil, nil, 0 end
+	local best = -1
+	for _, c in ipairs(cands) do
+		if (good < 3 or c.rate >= 0.45) and c.rate > best then best = c.rate end
+	end
+	for _, c in ipairs(cands) do
+		if (good < 3 or c.rate >= 0.45) and c.rate >= best - HEROPICK_TIE then
+			return c.name, c.rate, #cands
+		end
+	end
+	return nil, nil, #cands
+end
+
 local function PickHeroForBotSlot(i, id)
 	DraftRngFork(DRAFT_RNG.PICK + i)
 	local team = TeamOfPlayer(id)
@@ -837,7 +877,14 @@ local function PickHeroForBotSlot(i, id)
 			print(k, scored[k].score, scored[k].name)
 		end
 
-		pick = SelectTopWithFuzz(scored)
+		if tHeroWinRates ~= nil then
+			local rate, nCands
+			pick, rate, nCands = PickByWinRate(scored, enemyNames)
+			print('HEROPICK team='..GetTeam()..' pos='..tostring(Role.RoleAssignment[sTeamName][i])..' hero='..tostring(pick)
+				..' rate='..(rate and string.format('%.3f', rate) or 'none')..' cands='..nCands)
+		else
+			pick = SelectTopWithFuzz(scored)
+		end
 
 		-- Fallback: if none are pickable (due to bans/repeats/weakcap), random available
 		if not pick then

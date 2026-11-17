@@ -36,7 +36,7 @@ const root = path.join(__dirname, "../..");
 const generalPath = path.join(root, "bots/Customize/general.lua");
 const utilsPath = path.join(root, "bots/FunLib/utils.lua");
 const lineupsPath = path.join(root, "docs/specs/measurement-lineups.md");
-const FLAGS = ["arbiter", "group", "learned", "fixes", "corefarm", "roshsafe"];
+const FLAGS = ["arbiter", "group", "learned", "fixes", "corefarm", "roshsafe", "heropick"];
 // Tune() names (TuneName in typescript/bots/FunLib/behavior/flags.ts; npm run check keeps them equal).
 const TUNES = ["core_farm_until", "regroup_radius", "enemy_group", "core_near", "push_lead", "roshan_first_time", "rosh_kill_time"];
 const backup = p => p + ".matchbak";
