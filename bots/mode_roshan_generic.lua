@@ -59,7 +59,9 @@ end
 -- that average with all of Roshan's health, and uses armor/(armor+20) as the damage cut. Game
 -- 9089630662: blocked=low_dps 121 times, Roshan never taken. Here: the team's summed right-click DPS,
 -- with Dota's armor formula, must kill Roshan within ROSH_KILL_TIME seconds.
-local ROSH_KILL_TIME = 90 -- right-clicks only (spells and items add more), and the Roshan stats above are rough (tunable)
+-- Right-clicks only (spells and items add more), and the Roshan stats above are rough. Read once, when this
+-- file loads: 90 unless the team's Customize.Behavior row has tune.rosh_kill_time (--tune rosh_kill_time).
+local ROSH_KILL_TIME = require(GetScriptDirectory()..'/FunLib/behavior/flags').Tune('rosh_kill_time', 90)
 local function TeamHasRoshanDPS(heroes)
 	local nMinute = math.floor(DotaTime() / 60)
 	local nHealth = 6000 + 260 * nMinute

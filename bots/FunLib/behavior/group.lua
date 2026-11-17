@@ -283,6 +283,7 @@ local ____desire_tiers = require(GetScriptDirectory().."/FunLib/behavior/desire_
 local DesireTier = ____desire_tiers.DesireTier
 local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
 local IsOn = ____flags.IsOn
+local Tuned = ____flags.Tuned
 function Allies()
     return __TS__ArrayFilter(
         GetUnitList(UnitType.AlliedHeroes),
@@ -315,7 +316,7 @@ local GATHER_RADIUS = 900
 local GATHER_WAIT = 6
 local TP_TIME = 4
 local TP_MIN_DIST = 4000
-local PUSH_LEAD = 2
+local PUSH_LEAD = Tuned("push_lead", 2)
 local WON_KILLS = 2
 local WON_WINDOW = 20
 local LATE_TIME = 30 * 60
@@ -332,14 +333,14 @@ local STOP_UNSEEN_TIME = 5
 local STOP_DEATHS = 2
 local STOP_DEATH_WINDOW = 10
 ____exports.PUSH_DESIRE = DesireTier.HIGH
-local ENEMY_GROUP = 3
+local ENEMY_GROUP = Tuned("enemy_group", 3)
 local ENEMY_GROUP_LINK = 1500
 local GROUP_MEMORY = 20
-local REGROUP_RADIUS = 2500
+local REGROUP_RADIUS = Tuned("regroup_radius", 2500)
 local REGROUP_ARRIVE = 1200
 local REGROUP_MIN_HP = 0.4
-local CORE_FARM_UNTIL = 25 * 60
-local CORE_NEAR = 3000
+local CORE_FARM_UNTIL = Tuned("core_farm_until", 25 * 60)
+local CORE_NEAR = Tuned("core_near", 3000)
 local CORE_FIGHT_RANGE = 1600
 local CORE_FIGHT_ENEMY = 1200
 local CORE_LOG_GAP = 20
@@ -440,7 +441,7 @@ local function AllyFightNear(bot)
 end
 --- Flag `corefarm`: a core bot (pos 1-3) before CORE_FARM_UNTIL.
 local function CoreWindow(bot)
-    return IsOn("corefarm") and bot:IsBot() and DotaTime() < CORE_FARM_UNTIL and jmz.GetPosition(bot) <= 3
+    return IsOn("corefarm") and bot:IsBot() and DotaTime() < CORE_FARM_UNTIL() and jmz.GetPosition(bot) <= 3
 end
 --- Flag `corefarm`: a core in its window with no ally fighting near it keeps farming instead of walking to the team.
 local function CoreFree(bot)
@@ -451,7 +452,7 @@ local function CoreNear(bot, lane, point)
     return bot:GetAssignedLane() == lane or Dist(
         bot:GetLocation(),
         point
-    ) <= CORE_NEAR
+    ) <= CORE_NEAR()
 end
 local function Bots()
     return __TS__ArrayFilter(
@@ -881,7 +882,7 @@ end
 local function PushStartWhy(now)
     local allies = jmz.GetNumOfAliveHeroes(false)
     local enemies = jmz.GetNumOfAliveHeroes(true)
-    if allies - enemies >= PUSH_LEAD then
+    if allies - enemies >= PUSH_LEAD() then
         return (("lead" .. tostring(allies)) .. "v") .. tostring(enemies)
     end
     if allies > enemies and CountSince(enemyDeaths, now, WON_WINDOW) >= WON_KILLS and CountSince(allyDeaths, now, WON_WINDOW) == 0 then
@@ -911,7 +912,7 @@ local function PushStopWhy(now)
             unseen = unseen + 1
         end
     end
-    if push.gathered and unseen >= STOP_UNSEEN and allies - enemies < PUSH_LEAD and not aegis then
+    if push.gathered and unseen >= STOP_UNSEEN and allies - enemies < PUSH_LEAD() and not aegis then
         return "unseen" .. tostring(unseen)
     end
     if now - push.since > PUSH_MAX then
@@ -1032,7 +1033,7 @@ local function Anchor()
     return best
 end
 local function UpdateRegroup(now)
-    if EnemyGroupSize() >= ENEMY_GROUP then
+    if EnemyGroupSize() >= ENEMY_GROUP() then
         groupSeenAt = now
     end
     local want = not laning and now - groupSeenAt <= GROUP_MEMORY
@@ -1173,7 +1174,7 @@ local function FarFromGroup(bot)
         if d <= REGROUP_ARRIVE then
             moving[id] = false
         end
-    elseif d > REGROUP_RADIUS then
+    elseif d > REGROUP_RADIUS() then
         moving[id] = true
     end
     return moving[id] == true

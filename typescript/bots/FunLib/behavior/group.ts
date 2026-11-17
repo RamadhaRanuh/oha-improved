@@ -42,7 +42,7 @@ import * as Utils from "bots/FunLib/utils";
 import * as Brain from "./team_brain";
 import * as Siege from "./siege";
 import { DesireTier } from "./desire_tiers";
-import { IsOn } from "./flags";
+import { IsOn, Tuned } from "./flags";
 
 const UPDATE = 1;
 // ---- defence (tunable)
@@ -56,7 +56,7 @@ const GATHER_WAIT = 6;
 const TP_TIME = 4; // channel plus walking off the tower
 const TP_MIN_DIST = 4000;
 // ---- push (tunable)
-const PUSH_LEAD = 2;
+const PUSH_LEAD = Tuned("push_lead", 2); // --tune push_lead
 const WON_KILLS = 2;
 const WON_WINDOW = 20;
 const LATE_TIME = 30 * 60;
@@ -74,15 +74,15 @@ const STOP_DEATHS = 2;
 const STOP_DEATH_WINDOW = 10;
 export const PUSH_DESIRE = DesireTier.HIGH;
 // ---- regroup (tunable)
-const ENEMY_GROUP = 3;
+const ENEMY_GROUP = Tuned("enemy_group", 3); // --tune enemy_group
 const ENEMY_GROUP_LINK = 1500;
 const GROUP_MEMORY = 20;
-const REGROUP_RADIUS = 2500;
+const REGROUP_RADIUS = Tuned("regroup_radius", 2500); // --tune regroup_radius
 const REGROUP_ARRIVE = 1200;
 const REGROUP_MIN_HP = 0.4;
 // ---- corefarm (tunable)
-const CORE_FARM_UNTIL = 25 * 60;
-const CORE_NEAR = 3000;
+const CORE_FARM_UNTIL = Tuned("core_farm_until", 25 * 60); // --tune core_farm_until
+const CORE_NEAR = Tuned("core_near", 3000); // --tune core_near
 const CORE_FIGHT_RANGE = 1600;
 const CORE_FIGHT_ENEMY = 1200;
 const CORE_LOG_GAP = 20;
@@ -187,7 +187,7 @@ function AllyFightNear(bot: Unit): boolean {
 
 /** Flag `corefarm`: a core bot (pos 1-3) before CORE_FARM_UNTIL. */
 function CoreWindow(bot: Unit): boolean {
-    return IsOn("corefarm") && bot.IsBot() && DotaTime() < CORE_FARM_UNTIL && jmz.GetPosition(bot) <= 3;
+    return IsOn("corefarm") && bot.IsBot() && DotaTime() < CORE_FARM_UNTIL() && jmz.GetPosition(bot) <= 3;
 }
 
 /** Flag `corefarm`: a core in its window with no ally fighting near it keeps farming instead of walking to the team. */
@@ -197,7 +197,7 @@ function CoreFree(bot: Unit): boolean {
 
 /** A push or defence target the core may still be pulled to: in its own lane or near it. */
 function CoreNear(bot: Unit, lane: Lane, point: Vector): boolean {
-    return bot.GetAssignedLane() === lane || Dist(bot.GetLocation(), point) <= CORE_NEAR;
+    return bot.GetAssignedLane() === lane || Dist(bot.GetLocation(), point) <= CORE_NEAR();
 }
 
 /** Living allied heroes, people included (they count as present but are never assigned). */
@@ -449,7 +449,7 @@ function PickPushLane(): Lane | null {
 function PushStartWhy(now: number): string | null {
     const allies = jmz.GetNumOfAliveHeroes(false);
     const enemies = jmz.GetNumOfAliveHeroes(true);
-    if (allies - enemies >= PUSH_LEAD) return `lead${allies}v${enemies}`;
+    if (allies - enemies >= PUSH_LEAD()) return `lead${allies}v${enemies}`;
     // Only while still ahead: at even numbers the push ended 1 s later (9090005145: won_fight then numbers4v4).
     if (allies > enemies && CountSince(enemyDeaths, now, WON_WINDOW) >= WON_KILLS && CountSince(allyDeaths, now, WON_WINDOW) === 0) return "won_fight";
     if (jmz.DoesTeamHaveAegis() && allies >= enemies) return "aegis";
@@ -466,7 +466,7 @@ function PushStopWhy(now: number): string | null {
     let unseen = 0;
     for (const e of Brain.Get().enemies) if (e.alive && e.lastSeenAge > STOP_UNSEEN_TIME) unseen++;
     // Only once gathered: enemies are often out of vision while we walk to the gather point.
-    if (push!.gathered && unseen >= STOP_UNSEEN && allies - enemies < PUSH_LEAD && !aegis) return `unseen${unseen}`;
+    if (push!.gathered && unseen >= STOP_UNSEEN && allies - enemies < PUSH_LEAD() && !aegis) return `unseen${unseen}`;
     if (now - push!.since > PUSH_MAX) return "time";
     if (Siege.CommitLane() !== null) return "siege";
     for (const lane of LANES) {
@@ -545,7 +545,7 @@ function Anchor(): Unit | null {
 }
 
 function UpdateRegroup(now: number): void {
-    if (EnemyGroupSize() >= ENEMY_GROUP) groupSeenAt = now;
+    if (EnemyGroupSize() >= ENEMY_GROUP()) groupSeenAt = now;
     const want = !laning && now - groupSeenAt <= GROUP_MEMORY;
     if (!want) {
         if (regrouping) Log("regroup end");
@@ -668,7 +668,7 @@ function FarFromGroup(bot: Unit): boolean {
     const d = Dist(bot.GetLocation(), rally);
     if (moving[id] === true) {
         if (d <= REGROUP_ARRIVE) moving[id] = false;
-    } else if (d > REGROUP_RADIUS) {
+    } else if (d > REGROUP_RADIUS()) {
         moving[id] = true;
     }
     return moving[id] === true;
