@@ -12,10 +12,8 @@ local Item = require(GetScriptDirectory()..'/FunLib/aba_item')
 local Roles = require(GetScriptDirectory()..'/FunLib/aba_role')
 local AttackSpecialUnit = dofile(GetScriptDirectory()..'/FunLib/aba_special_units')
 
--- Smoke ganks and counter-gank TPs (behavior/gank, flag `roam`).
 local Flags = require(GetScriptDirectory()..'/FunLib/behavior/flags')
-local Gank = Flags.IsOn('roam') and require(GetScriptDirectory()..'/FunLib/behavior/gank') or nil
-local sHumanMode = nil -- 'tp' | 'gank' | 'group' | 'explore' while one of them owns this mode
+local sHumanMode = nil -- 'group' | 'explore' while one of them owns this mode
 -- Behaviour flag `group`: walk to a defence or push meeting point, or back to the regrouping team (behavior/group).
 local Group = Flags.IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/group') or nil
 -- Exploration in data games (behavior/decision_log): a forced fight runs through team roam.
@@ -141,16 +139,6 @@ function GetDesireHelper()
     -- Debug: which part of team roam bid, read by the DEATH trail in mode_retreat_generic.lua.
     bot.roamSub = 'other'
 
-    -- A TP to a ganked ally: while channeling nothing else may give an order.
-    if Gank ~= nil then
-        local nTp = SafeCall('tp', Gank.TpDesire, bot) or 0
-        if nTp > 0 then
-            sHumanMode = 'tp'
-            bot.roamSub = 'tp'
-            return nTp
-        end
-    end
-
     local target
     target, ShouldHelpWhenCoreIsTargeted = X.ConsiderHelpWhenCoreIsTargeted()
     if ShouldHelpWhenCoreIsTargeted then
@@ -177,14 +165,6 @@ function GetDesireHelper()
 			sHumanMode = 'group'
 			bot.roamSub = 'gather'
 			return nGather
-		end
-	end
-	if Gank ~= nil then
-		local nGank = SafeCall('gank', Gank.GankDesire, bot) or 0
-		if nGank > 0 then
-			sHumanMode = 'gank'
-			bot.roamSub = 'gank'
-			return nGank
 		end
 	end
 	if Group ~= nil then
@@ -371,15 +351,7 @@ function Think()
 		SafeCall('decision_log', DecisionLog.FightThink, bot)
 		return
 	end
-	if sHumanMode == 'tp' then
-		SafeCall('tp', Gank.TpThink, bot) -- gives no order while channeling
-		return
-	end
     if J.CanNotUseAction(bot) then return end
-	if sHumanMode == 'gank' then
-		SafeCall('gank', Gank.GankThink, bot)
-		return
-	end
 	if sHumanMode == 'group' then
 		SafeCall('group', Group.Think, bot)
 		return
