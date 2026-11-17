@@ -2,7 +2,7 @@
 
 ## Morning summary, 2026-11-18 (night loop 22:05-06:00)
 
-**Headline: in free drafts the new bot now beats plain OHA about 90% of the time.** `heropick` (kept, merged 909ab2b) won **58/64 = 91% (95% range 81-96%)** on fresh draft seeds, against 27/64 for the base on the same seeds (paired +48 points, range +35 to +62; gold at 30:00 +7.7k). Replication on another fresh seed set, dr-hp2: 16/17 so far (finishing; final line in the log below). On the fixed measurement lineups (the original 90% stick) nothing changed tonight: the base stays about 57%.
+**Headline: in free drafts the new bot now beats plain OHA about 90% of the time.** `heropick` (kept, merged 909ab2b) won **58/64 = 91% (95% range 81-96%)** on fresh draft seeds, against 27/64 for the base on the same seeds (paired +48 points, range +35 to +62; gold at 30:00 +7.7k). Replication on another fresh seed set, dr-hp2: **30/32 = 94% (80-98%)**, +9.0k at 30:00. **Pooled over both fresh seed sets: 88/96 = 92% (about 84-96%).** On the fixed measurement lineups (the original 90% stick) nothing changed tonight: the base stays about 57%.
 
 **What ran**
 1. Retro first (analyst, 904 pooled games, winners vs losers): every behaviour flag so far moved the 30:00 lead under ~2k, below the 2.3k drift between identical batches; 90% needs about +12.8k. The one factor with a big enough spread was hero choice (OHA bots win 19-75% depending on the hero). Radiant wins 53.9% (a lane-phase edge, no behaviour weakness found).
@@ -21,7 +21,7 @@
 2. Fixed-lineup 90%: behaviour flags have not moved it; candidates are a gold-lead-labelled learned policy and the generic retreat (76% of all deaths happen in retreat mode, 46% with at most one ally near).
 3. Make heropick less predictable (sample among heroes within ~0.03 of the best) and test it against a stronger drafter.
 
-## Current state (updated 2026-11-18 03:45)
+## Current state (updated 2026-11-18 05:45)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
@@ -29,12 +29,12 @@ How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -
 |---|---|
 | Base | `group,fixes,corefarm,roshsafe,heropick` (heropick merged 909ab2b, acts only in free drafts); flags in code: arbiter, group, learned, fixes, corefarm, roshsafe, heropick; thresholds tunable with `--tune` |
 | Baselines | fixed lineups: ev-gfc-roshsafe2 (full, 20/32) + sc-gfcr-base (screen); free drafts: dr-gfcr (15/32) |
-| In test | dr-hp2: heropick replication on fresh seeds 65-80 (games 129-160) |
+| In test | nothing running (loop stopped 05:45 for the user) |
 | Next | user decisions: Weak_Hero_Cap fix + fresh fixed-lineup baselines; merge herofix unflagged or not; next lever for the fixed-lineup 90% |
 | Kept | `fixes` (user), `group`, `corefarm`, `roshsafe`, `heropick` |
 | Removed after a complete batch | `bail`, `yield`, `siegecut`, `noregroup`, `farmfree`, `fight`, `retreat`, `farm`, `escape`, `humanfeel`, `laning`, `roam` |
 | Left off, code kept | `arbiter` (+0.7k, inconclusive), `learned` (parked), draft v1/v2 (wt/draft, wt/draft2), `herofix2` (wt/herofix2: PA escape, axe cull; -0.7k, inconclusive), `herofix` (wt/herofix: lone_druid, kez, hoodwink; 27/48, +0.7k, inconclusive) |
-| Where things stand | free drafts: 58/64 = 91% (81-96%) with heropick vs 25/59 for the base on the same seeds; fixed lineups: base about 57% (73/127), herofix inconclusive (27/48) |
+| Where things stand | free drafts: 88/96 = 92% (dr-hp 58/64 + dr-hp2 30/32) with heropick vs 25/59 for the base on the same seeds; fixed lineups: base about 57% (73/127), herofix inconclusive (27/48) |
 
 The log below is chronological; the newest entries are at the end.
 
@@ -238,3 +238,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **03:45** dr-hp COMPLETE: **58/64 = 91% (95% range 81-96%), verdict BETTER against 50%**, gold at 30:00 +7.3k (range +5.4k to +9.2k), nw10 +2.3k, lh10 +32, early deaths -1.9; 27 of 32 seeds won from both sides. Same seeds with the base (dr-gfcr-b): 25/59 so far. **heropick KEPT**, merged 909ab2b (build and check ok); BEHAVIOR_CHANGES updated. NEW BASE: `group,fixes,corefarm,roshsafe,heropick`. Caveats: (1) the rates are OHA-vs-OHA; against humans or other drafters the gain is unmeasured; (2) the picks are deterministic per role pool (sniper and jakiro every game), so a human can predict them; (3) refit with `npm run herorates` as data grows. herofix2 COMPLETE: 10/16, gold -0.7k (range -4.2k to +2.8k), wins -6 points: inconclusive, not kept, left on wt/herofix2 for the user. Started ev-gfcr-herofix-c (third run of the herofix games) so herofix gets 48 games.
 - **04:05** Paired confirmation: compare dr-hp dr-gfcr-b (same seeds 33-64, 64 games each): wins 58 vs 27, paired +48 points (range +35 to +62), verdict BETTER; gold at 30:00 +7.7k (range +5.0k to +10.5k), Gold PASS; +2.5k already at 10:00. heropick's keep stands. The base alone won 27/64 (42%) on these seeds and 15/32 on seeds 1-16: the base without heropick is about 44% in free drafts (42/96). herofix replays so far: -b 4/10, -c 2/5 (the first run's 10/16 is fading).
 - **04:45** herofix replays complete. Three runs of the same 16 games vs the base pool: run a 10/16, +3.0k, +13 points; run b 7/16, -0.5k, -6 points; run c 10/16, -0.4k, +13 points. Pooled: 27/48 (56%), gold about +0.7k at 30:00. In the 8 games per run where the new team actually has lone_druid, kez or hoodwink: 7/24 (29%) vs 1/8 for the base (ev-gfc-roshsafe2): weak lineups stay weak. Verdict: inconclusive, **herofix not kept** (keep rule). The fixes remove real bugs (lone_druid's carry items go to a bear that roams; Scurry never cast; kez never escapes), so they may be worth merging unflagged for real lobbies (both teams then get them): user decision; left on wt/herofix 23d334c. Started dr-hp2: heropick on another fresh seed set (games 129-160 = seeds 65-80, parallel 10) as a replication for the morning.
+- **05:45** dr-hp2 COMPLETE (heropick, fresh seeds 65-80): 30/32 = 94% (95% range 80-98%), gold at 30:00 +9.0k (range +6.5k to +11.6k), nw10 +2.7k, verdict BETTER against 50%. Pooled with dr-hp: 88/96 = 92% in free drafts. Loop stopped for the user's return; nothing running. Worktrees left: wt/herofix, wt/herofix2 (not kept, for review), wt/heropick (merged; can be removed), plus the older draft/rm*/tune ones.
