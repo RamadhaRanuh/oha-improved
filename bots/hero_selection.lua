@@ -18,10 +18,18 @@ require( GetScriptDirectory()..'/FunLib/aba_global_overrides' )
 -- Reproducible test drafts (docs/TESTING.md, "Drafting changes")
 --   Customize.Draft_Seed = <n> (npm run match -- <game> <flags> --draft): every
 --   random draw this file makes (RandomInt, RandomFloat, math.random, also inside
---   the modules it calls) comes from a Park-Miller stream seeded with the seed and
---   the team, so a seed reproduces both teams' drafts. The drafting itself is
---   plain OHA's. Read from the raw config, even when Customize.Enable is false.
---   Without a seed, nothing here changes how heroes are picked.
+--   the modules it calls) comes from a Park-Miller stream seeded with the seed, the
+--   team and the decision, so a seed reproduces both teams' drafts. The drafting
+--   itself is plain OHA's. Read from the raw config, even when Customize.Enable is
+--   false. Without a seed, nothing here changes how heroes are picked.
+--
+--   Each decision restarts its own stream (DraftRngFork): the module setup, the
+--   role pools, the preselects, the pick schedule, the pick-order shuffle and
+--   every slot's pick. One continuous stream did not reproduce in real games: the
+--   pools draw once per hero in pairs() order, the game's Lua iterates string keys
+--   in a different order every process, so the setup used 657 to 669 draws and
+--   every later draw shifted. Seeded, the hero map is also walked in a fixed order
+--   (a seeded shuffle of the sorted names, as random as pairs() but repeatable).
 --==============================================================================
 
 local nDraftSeed = nil
@@ -32,13 +40,47 @@ do
 	end
 end
 
+local DraftRngLib = nil
 local DraftRng = nil
 local DraftRngSaved = nil
 if nDraftSeed ~= nil then
 	local okRng, Rng = pcall(require, GetScriptDirectory()..'/FunLib/behavior/rng')
 	if okRng and type(Rng) == 'table' and Rng.Seeded then
-		DraftRng = Rng.Seeded(nDraftSeed, GetTeam())
+		DraftRngLib = Rng
 	end
+end
+
+-- Sub-stream per decision, from (seed, team, tag); tag DRAFT_RNG.PICK + slot for a pick.
+local DRAFT_RNG = { SETUP = 1, ORDER = 2, POOLS = 3, PRESELECT = 4, SCHEDULE = 5, SHUFFLE = 6, PICK = 10 }
+
+-- a * b mod 2^31-1, exact in doubles for a, b in [0, 2^31-1).
+local DRAFT_MOD = 2147483647
+local function DraftMulMod(a, b)
+	local hi = math.floor(b / 65536)
+	local lo = b - hi * 65536
+	return ((a * hi) % DRAFT_MOD * 65536 + a * lo) % DRAFT_MOD
+end
+
+-- Non-linear mix of the stream's inputs. Park-Miller is linear in its start value, so
+-- starts that differ by a constant (seed + 1, the other team, the next slot) would give
+-- copies of one stream shifted by a constant: the teams' and slots' rolls would be coupled.
+local function DraftMixSeed(seed, team, tag)
+	local h = 1234567
+	for _, v in ipairs({ seed, team, tag }) do
+		h = (h + math.abs(v) % DRAFT_MOD + 1) % DRAFT_MOD
+		for _ = 1, 2 do
+			h = (DraftMulMod(h, h) + DraftMulMod(h, 48271) + 1) % DRAFT_MOD
+		end
+	end
+	return h
+end
+
+local function NewDraftStream(tag)
+	return DraftRngLib.Seeded(DraftMixSeed(nDraftSeed, GetTeam(), tag), 0)
+end
+
+if DraftRngLib ~= nil then
+	DraftRng = NewDraftStream(DRAFT_RNG.SETUP)
 end
 
 -- Swap the seeded stream in for the global random functions, and back.
@@ -60,6 +102,43 @@ local function DraftRngOff()
 	RandomFloat = DraftRngSaved.RandomFloat
 	math.random = DraftRngSaved.random
 	DraftRngSaved = nil
+end
+
+-- Restart the seeded stream for one decision, so its draws never depend on how many
+-- draws came before it (frames, pool sizes, pairs() order). No-op without a seed.
+local function DraftRngFork(tag)
+	if DraftRngLib == nil then return end
+	local bOn = DraftRngSaved ~= nil
+	DraftRngOff()
+	DraftRng = NewDraftStream(tag)
+	if bOn then DraftRngOn() end
+end
+
+-- pairs() over a hero-keyed map. Seeded: a fixed order (the sorted names shuffled by
+-- their own sub-stream), the same in every process. Unseeded: plain pairs().
+local function HeroPairs(map)
+	if DraftRngLib == nil then return pairs(map) end
+	local keys = {}
+	for k in pairs(map) do keys[#keys + 1] = k end
+	table.sort(keys)
+	local r = NewDraftStream(DRAFT_RNG.ORDER)
+	for n = #keys, 2, -1 do
+		local j = r.Int(1, n)
+		keys[n], keys[j] = keys[j], keys[n]
+	end
+	local idx = 0
+	return function()
+		idx = idx + 1
+		local k = keys[idx]
+		if k ~= nil then return k, map[k] end
+	end
+end
+
+-- Trace only (seeded): a checksum of what the setup drew, equal in two games of one seed.
+local function DraftChecksum(h, s)
+	s = tostring(s)
+	for n = 1, #s do h = (h * 31 + string.byte(s, n)) % 2147483647 end
+	return h
 end
 
 print('DRAFTFLAG team='..GetTeam()..' seed='..tostring(nDraftSeed or 'none')..(nDraftSeed ~= nil and DraftRng == nil and ' rng=missing' or ''))
@@ -206,7 +285,7 @@ local sTeamName = GetTeam() == TEAM_RADIANT and 'TEAM_RADIANT' or 'TEAM_DIRE'
 
 local function GetAllHeroNames(heroPosMap)
     local heroNames = {}
-    for heroName, _ in pairs(heroPosMap) do
+    for heroName, _ in HeroPairs(heroPosMap) do
         table.insert(heroNames, heroName)
     end
     return heroNames
@@ -231,7 +310,7 @@ end
 local function GetPositionedPool(heroPosMap, position)
     local heroList = {}
 	-- Pick from weighted options for the pos first.
-    for heroName, roleWeights in pairs(heroPosMap) do
+    for heroName, roleWeights in HeroPairs(heroPosMap) do
         local weight = roleWeights[position]
         if weight > RandomInt(5, ROLE_WEIGHT_THRESHOLD) then
 			if not Utils.HasValue(WeakHeroes, heroName) or RandomInt(1, 10) > 7 then
@@ -272,6 +351,7 @@ end
 
 SupportedHeroes = GetAllHeroNames(HeroPositionMap)
 
+DraftRngFork(DRAFT_RNG.POOLS)
 tSelectPoolList = {
 	[1] = GetPositionedPool(HeroPositionMap, 1),
 	[2] = GetPositionedPool(HeroPositionMap, 2),
@@ -280,6 +360,7 @@ tSelectPoolList = {
 	[5] = GetPositionedPool(HeroPositionMap, 5),
 }
 
+DraftRngFork(DRAFT_RNG.PRESELECT)
 sSelectList = {
 	[1] = tSelectPoolList[1][RandomInt( 1, #tSelectPoolList[1] )],
 	[2] = tSelectPoolList[2][RandomInt( 1, #tSelectPoolList[2] )],
@@ -335,6 +416,18 @@ if Customize then
 			end
 		end
 	end
+end
+
+-- Customize.Draft_Seed: one line per team that two games of one seed must share.
+if DraftRngLib ~= nil then
+	local hPools, hPre = 0, 0
+	for pos = 1, 5 do
+		for _, h in ipairs(tSelectPoolList[pos]) do hPools = DraftChecksum(hPools, h) end
+		hPools = DraftChecksum(hPools, '|')
+		hPre = DraftChecksum(hPre, sSelectList[pos])
+	end
+	print('DRAFTSETUP team='..GetTeam()..' seed='..nDraftSeed..' heroes='..#SupportedHeroes
+		..' pools='..hPools..' preselect='..hPre)
 end
 
 --==============================================================================
@@ -725,6 +818,7 @@ local function SelectTopWithFuzz(scored)
 end
 
 local function PickHeroForBotSlot(i, id)
+	DraftRngFork(DRAFT_RNG.PICK + i)
 	local team = TeamOfPlayer(id)
 	local rolePool = tSelectPoolList[i]
 	local preselect = sSelectList[i]
@@ -788,6 +882,7 @@ local function AllPickHeros()
 
 	-- Shuffle internal pick order when all-bot team to mix patterns
 	if not ShuffledPickOrder[sTeamName] and not Utils.IsHumanPlayerInTeam(GetTeam()) then
+		DraftRngFork(DRAFT_RNG.SHUFFLE)
 		X.ShufflePickOrder(teamPlayers)
 		ShuffledPickOrder[sTeamName] = true
 	end
@@ -993,6 +1088,7 @@ local function InitPickScheduleOnce()
 	local jitter_min, jitter_max = 1, 3   -- small variability per slot
 
 	local teamPlayers = GetTeamPlayers(GetTeam(), true)
+	DraftRngFork(DRAFT_RNG.SCHEDULE)
 	for slot = 1, #teamPlayers do
 		-- tiny jitter per-slot for a more organic feel
 		local jitter = RandomFloat(jitter_min, jitter_max)
