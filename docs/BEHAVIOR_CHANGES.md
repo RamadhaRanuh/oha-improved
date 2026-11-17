@@ -76,7 +76,7 @@ sv_cheats 1; script_reload_code bots/tools/match_recorder
 
 It records human-played heroes and K/D/A as well.
 
-Every `npm run match` setup also turns on the fight decision log (`FIGHTDEC` / `FIGHTOUT` lines for every bot on both teams). Add `--explore=0.03` for data-collection games. Add `--draft` for a free draft: both teams pick their own heroes with plain OHA's drafting, and `Customize.Draft_Seed = ceil(game/2)` makes both drafts reproducible (all random draws in `hero_selection.lua` come from a stream seeded with the seed and the team); the new team is Radiant on odd games and Dire on even games. `npm run decisions` builds `datasets/fight_decisions.csv` from the logs. See [specs/learned-fight-decisions.md](specs/learned-fight-decisions.md).
+Every `npm run match` setup also turns on the fight decision log (`FIGHTDEC` / `FIGHTOUT` lines for every bot on both teams). Add `--explore=0.03` for data-collection games. Add `--draft` for a free draft: both teams pick their own heroes with plain OHA's drafting, and `Customize.Draft_Seed = ceil(game/2)` makes both drafts reproducible (all random draws in `hero_selection.lua` come from streams seeded with the seed, the team and the decision; [TESTING.md](TESTING.md) "Drafting changes" says what still varies); the new team is Radiant on odd games and Dire on even games. `npm run decisions` builds `datasets/fight_decisions.csv` from the logs. See [specs/learned-fight-decisions.md](specs/learned-fight-decisions.md).
 
 ## 3. The modules
 
