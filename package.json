@@ -19,6 +19,7 @@
         "build": "npm run build:lua",
         "check": "node ./typescript/post-process/check.js",
         "diagnose": "node ./typescript/post-process/diagnose.js",
+        "herorates": "node ./typescript/post-process/hero-rates.js",
         "dev": "tstl -p tsconfig-tstl.json --watch",
         "prettier": "prettier ./bots ./typescript --write",
         "phase0": "node ./typescript/post-process/phase0-report.js",
