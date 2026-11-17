@@ -99,12 +99,17 @@ const flagKey = s => [...s].sort().join(",") || "none";
 function sameBase(a, bases) {
     const fa = flagSet(manifestOf(a));
     const fbs = bases.map(b => flagSet(manifestOf(b)));
+    // A --tune set counts as one change (a bundle is tested as one); the baselines must share theirs.
+    const ta = manifestOf(a).tune || "";
+    const tbs = bases.map(b => manifestOf(b).tune || "");
     const problems = [];
     if (new Set(fbs.map(flagKey)).size > 1) problems.push(`the pooled baselines have different flags (${bases.map((b, i) => `${b}: ${flagKey(fbs[i])}`).join("; ")})`);
+    if (new Set(tbs).size > 1) problems.push(`the pooled baselines have different tune values (${bases.map((b, i) => `${b}: ${tbs[i] || "none"}`).join("; ")})`);
     const added = [...fa].filter(f => !fbs[0].has(f));
     const missing = [...fbs[0]].filter(f => !fa.has(f));
-    if (added.length > 1 || missing.length)
-        problems.push(`${a} (${flagKey(fa)}) is not its baseline (${flagKey(fbs[0])}) plus one flag: added ${added.join(",") || "none"}, missing ${missing.join(",") || "none"}`);
+    const tuned = ta !== tbs[0] ? 1 : 0;
+    if (added.length + tuned > 1 || missing.length)
+        problems.push(`${a} (${flagKey(fa)}${ta ? `, tune ${ta}` : ""}) is not its baseline (${flagKey(fbs[0])}${tbs[0] ? `, tune ${tbs[0]}` : ""}) plus one change: added ${added.join(",") || "none"}${tuned ? " and a tune set" : ""}, missing ${missing.join(",") || "none"}`);
     if (!problems.length) return;
     const msg = `Baseline mismatch: ${problems.join("; ")}. The result would mix in other flags and batch drift. Use a baseline with ${a}'s flags minus the one under test, or add --mismatch to compare anyway.`;
     if (opts.mismatch === true) console.log(`WARNING ${msg}`);
@@ -278,12 +283,18 @@ function start() {
     const manifest = { name, flags, kind: data ? "data" : "eval", commit, parallel, timescale, explore: Number(explore), started: new Date().toISOString(), games: {} };
     if (screen) manifest.screen = screen;
     if (draft) manifest.draft = true;
+    // --tune=name=value[,...]: thresholds for the new team only (flags.ts Tune); match-setup validates the names.
+    const tune = typeof opts.tune === "string" && opts.tune ? opts.tune : "";
+    if (opts.tune !== undefined && !tune) fail("--tune needs name=value[,name=value...]");
+    if (tune) manifest.tune = tune;
     for (const g of games) {
         const args = [path.join(__dirname, "match-setup.js"), String(g), flags, `--explore=${explore}`, `--out=${path.join(dir, "cfg", `g${g}`)}`];
         if (draft) args.push("--draft");
+        if (tune) args.push(`--tune=${tune}`);
         const r = spawnSync(process.execPath, args, { encoding: "utf8" });
         if (r.status !== 0) fail(`match-setup failed for game ${g}:\n${r.stderr || r.stdout}`);
         if (draft && !/free draft, Draft_Seed \d+/.test(r.stdout)) fail(`match-setup did not set up a free draft for game ${g} (is this the draft code?):\n${r.stdout}`);
+        if (tune && (r.stdout.match(/ tune=(\S+)$/m) || [])[1] !== tune) fail(`match-setup did not apply --tune=${tune} for game ${g} (is this the tune code?):\n${r.stdout}`);
         const radiantNew = /Radiant:.*<- NEW/.test(r.stdout);
         // In a free draft the "pair" is the seed: games 2k-1 and 2k.
         const pair = (r.stdout.match(draft ? /Draft_Seed (\d+)/ : /pair (\d+)/) || [])[1];
@@ -293,7 +304,7 @@ function start() {
     fs.writeFileSync(path.join(dir, "games.txt"), games.join("\n") + "\n");
 
     launch(dir, name, "games.txt", parallel, timescale, screen);
-    console.log(`Batch ${name} (${manifest.kind}${draft ? ", free draft" : ""}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
+    console.log(`Batch ${name} (${manifest.kind}${draft ? ", free draft" : ""}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}${tune ? `, tune ${tune}` : ""}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
     console.log(`  Logs: ${path.relative(root, dir)}   Progress: npm run batch -- status   Results: npm run batch -- report`);
 }
 
@@ -699,7 +710,7 @@ function compare(a, b) {
     const A = results(a);
     const Bb = pooled(b);
     for (const [n, x] of [[a, A], [b, Bb]]) {
-        console.log(`${n} (${x.kind}, flags ${x.m.flags}, commit ${x.m.commit || "?"}): ${x.won}/${x.played} won${x.played < x.total ? `, ${x.total - x.played} of ${x.total} games not finished` : ""}`);
+        console.log(`${n} (${x.kind}, flags ${x.m.flags}${x.m.tune ? `, tune ${x.m.tune}` : ""}, commit ${x.m.commit || "?"}): ${x.won}/${x.played} won${x.played < x.total ? `, ${x.total - x.played} of ${x.total} games not finished` : ""}`);
     }
     const ga = Object.keys(A.m.games).sort().join(",");
     const gb = Object.keys(Bb.m.games).sort().join(",");
