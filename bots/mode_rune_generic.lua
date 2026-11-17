@@ -1,22 +1,7 @@
 local X = {}
 local J = require(GetScriptDirectory()..'/FunLib/jmz_func')
 local Customize = require(GetScriptDirectory()..'/Customize/general')
--- Pre-horn plans (behavior/prehorn, flag `humanfeel`): varied spots and timing, feints, bounty steals, ambushes.
 local Siege = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/siege') or nil
-local Prehorn = require(GetScriptDirectory()..'/FunLib/behavior/flags').IsOn('humanfeel') and require(GetScriptDirectory()..'/FunLib/behavior/prehorn') or nil
--- Behaviour modules run under pcall: a bug in one must not take down the whole mode, and Valve's
--- console only prints "error in error handling" for errors here, so print the real message (once each).
-local tBehaviorErrors = {}
-local function SafeCall(sName, fn, ...)
-	local ok, res = pcall(fn, ...)
-	if ok then return res end
-	local sMsg = tostring(res)
-	if not tBehaviorErrors[sMsg] then
-		tBehaviorErrors[sMsg] = true
-		print('BEHAVIOR_ERROR '..sName..' team='..GetTeam()..' t='..math.floor(DotaTime())..' '..sMsg)
-	end
-	return nil
-end
 
 Customize.ThinkLess = Customize.Enable and Customize.ThinkLess or 1
 
@@ -75,11 +60,6 @@ local nShrineOfWisdomTeam = TEAM_RADIANT
 --------------------------------------------------------------------
 function GetDesire()
 	X.InitRune()
-
-	if Prehorn ~= nil then
-		local nPrehorn = SafeCall('prehorn', Prehorn.Desire, bot) or 0
-		if nPrehorn > 0 then return nPrehorn end
-	end
 
 	-- Behaviour flag `group`: no rune trips during a high-ground commit window (behavior/siege).
 	if Siege ~= nil and DotaTime() > 0 and Siege.CommitLane() ~= nil then
@@ -274,10 +254,6 @@ end
 --------------------------------------------------------------------
 local fNextMovementTime = -math.huge
 function Think()
-	if Prehorn ~= nil and DotaTime() < Prehorn.LAST_TIME and SafeCall('prehorn', Prehorn.Think, bot) then
-		return
-	end
-
 	if bot:IsInvulnerable() and bot:DistanceFromFountain() < 500 then
 		bot:Action_MoveToLocation(bot:GetLocation() + RandomVector(500))
 		return
