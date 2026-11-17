@@ -1,18 +1,19 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
-## Current state (updated 2026-11-17 02:49)
+## Current state (updated 2026-11-17 22:20)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
-| Base | `group,fixes,corefarm` (corefarm merged 02:30, 8d12c04); baseline pool sc-gf-corefarm+ev-gf-corefarm (64 games, 32 full) |
-| In test | `retreat` screen sc-gfc-retreat on the new base vs the pool sc-gf-corefarm+ev-gf-corefarm |
-| Next | screens on the new base of the remaining existing flags vs the new pool: retreat, farm, roam, escape, humanfeel, arbiter; earlyretreat onto the new base if positive |
-| Kept so far | `fixes` (by the user's decision, not by a batch) |
-| Removed after a complete batch | `bail`, `yield`, `siegecut` (53ba259), `noregroup` (d301818), `farmfree` (ce70e60) |
-| Parked | `learned` (1 of 6 games) |
-| Where games are lost | 15:00-35:00: the new team farms 21-24% of the time against plain OHA's 29-34% (about 5% less gold per minute per hero), and dies 20-22 times per game after 35:00 against 15-18 |
+| Base | `group,fixes,corefarm,roshsafe` (roshsafe v2 merged 5e12242); flags in code: arbiter, group, learned, fixes, corefarm, roshsafe; thresholds tunable with `--tune` |
+| Baselines | fixed lineups: ev-gfc-roshsafe2 (full, 20/32) + sc-gfcr-base (screen); free drafts: dr-gfcr (15/32) |
+| In test | ev-gfcr-base2 (second full base eval, for a 64-game claim and a two-full-batch pool); retro analyst on bigger levers |
+| Next | build the retro's top lever behind a flag, screen it against the pool |
+| Kept | `fixes` (user), `group`, `corefarm`, `roshsafe` |
+| Removed after a complete batch | `bail`, `yield`, `siegecut`, `noregroup`, `farmfree`, `fight`, `retreat`, `farm`, `escape`, `humanfeel`, `laning`, `roam` |
+| Left off, code kept | `arbiter` (+0.7k, inconclusive), `learned` (parked), draft v1/v2 (wt/draft, wt/draft2, not merged) |
+| Where things stand | base about 57% on fixed lineups (73/127 pooled), 47% in free drafts (15/32); 90% needs about +12.8k at 30:00, every change so far moved under ~2k |
 
 The log below is chronological; the newest entries are at the end.
 
@@ -203,3 +204,4 @@ Detecting a real 60% against 50% needs about 200 games; 32 games show a real 75%
 - **18:03** User stopped the loop (going to play a game). Left running: dr-gfcr and sc-tune-farm (sc-tune-farm +0.2k over 13/32 at 17:53, early verdict continue). Next session: compare sc-tune-farm ev-gfc-roshsafe2+sc-gfcr-base; report dr-gfcr's win rate; then the rosh bundle (full batch) or enemy_group=4.
 - **19:55** sc-tune-farm (farm bundle) complete: -1.5k at 30:00 vs ev-gfc-roshsafe2+sc-gfcr-base (range -3.7k to +0.8k), 10:00-adjusted -1.7k (range -3.8k to +0.4k): inconclusive, leaning worse; not kept. dr-gfcr (base, seeded free drafts) complete.
 - **19:55** dr-gfcr result: 15/32 (47%, range 31-64%), gold at 30:00 -2.3k (range -5.8k to +1.1k): the current base is not better than plain OHA in free drafts. Almost every seed split 1/2: the same draft wins from one side whichever team's code plays it, so free-draft results are decided mostly by the draft.
+- **22:10** NIGHT LOOP (user asleep until 06:00, goal 90%). Retro first: every 11-17 screen was inconclusive, and 90% needs about +12.8k at 30:00 against changes that move under 2k, so small threshold tweaks are dropped as a strategy. An analyst pools all batches and compares winners with losers (and Radiant with Dire) to find levers worth 5k+ (lane last hits, tower timing, item timings, Roshan, side weaknesses). Meanwhile started ev-gfcr-base2 (base, full, 1-32, parallel 5): a second full base baseline for a 64-game claim, and a two-full-batch pool for the next change.
