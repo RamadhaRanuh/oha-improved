@@ -1,5 +1,26 @@
 # Overnight run, 2026-11-15 to 2026-11-16
 
+## Morning summary, 2026-11-18 (night loop 22:05-06:00)
+
+**Headline: in free drafts the new bot now beats plain OHA about 90% of the time.** `heropick` (kept, merged 909ab2b) won **58/64 = 91% (95% range 81-96%)** on fresh draft seeds, against 27/64 for the base on the same seeds (paired +48 points, range +35 to +62; gold at 30:00 +7.7k). Replication on another fresh seed set, dr-hp2: 16/17 so far (finishing; final line in the log below). On the fixed measurement lineups (the original 90% stick) nothing changed tonight: the base stays about 57%.
+
+**What ran**
+1. Retro first (analyst, 904 pooled games, winners vs losers): every behaviour flag so far moved the 30:00 lead under ~2k, below the 2.3k drift between identical batches; 90% needs about +12.8k. The one factor with a big enough spread was hero choice (OHA bots win 19-75% depending on the hero). Radiant wins 53.9% (a lane-phase edge, no behaviour weakness found).
+2. `heropick`: the new team picks, per role slot, the pickable hero with the highest OHA-vs-OHA win rate from a ridge logistic regression over all games (lineup and side effects removed; held-out accuracy 70%). Rates: `npm run herorates` -> `bots/FunLib/hero_win_rates.lua`. Tested on seeds the rates never saw. **Kept.**
+3. `herofix` (lone_druid keeps its items instead of feeding a roaming bear; kez and hoodwink escape casts that never fired): 3 runs of the 16 affected games, 27/48, +0.7k: inconclusive, **not kept** (wt/herofix).
+4. `herofix2` (phantom_assassin escape Strike/Blur, axe Culling Blade range/threshold): 10/16, -0.7k: inconclusive, **not kept** (wt/herofix2).
+
+**Found, not changed (needs you)**
+- **Weak_Hero_Cap = 1** in hero_selection.lua silently swaps the second "weak" hero on a team (lone_druid, wisp, hoodwink, primal_beast, puck, marci...) for a random one: 39% of fixed-lineup games do not play the listed lineup. Fair between teams but noisy. Proposal: match-setup writes Weak_Hero_Cap = 5 for fixed lineups, then fresh baselines (this breaks comparability with every old baseline, so I did not do it overnight).
+- herofix / herofix2 remove real script bugs. Merging them unflagged (both teams) would help real lobbies but cannot be measured by the A/B test. Your call.
+
+**Caveats on the 91%:** measured against plain OHA's drafter only; against humans the hero rates (OHA playing OHA) may not hold. Picks are deterministic per role pool (sniper and jakiro every game). Refit the table as data grows (`npm run herorates`).
+
+**Next steps (proposed)**
+1. Decide the Weak_Hero_Cap fix and re-baseline the fixed lineups.
+2. Fixed-lineup 90%: behaviour flags have not moved it; candidates are a gold-lead-labelled learned policy and the generic retreat (76% of all deaths happen in retreat mode, 46% with at most one ally near).
+3. Make heropick less predictable (sample among heroes within ~0.03 of the best) and test it against a stronger drafter.
+
 ## Current state (updated 2026-11-18 03:45)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
