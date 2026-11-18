@@ -38,6 +38,7 @@
 - **10:58** smoke-herofix3 PASS (game 17, to 42:28): new team kez escape 9, axe cull 12; nothing for the old team; 0 BEHAVIOR_ERROR. Started ev-v2-base3 (base, 1-32, 5 at once; queues for ports). herofix eval starts when ev-v2-base2 frees its slots. Progress: ev-v2-base2 8/32, aa-v21 5/8 (pair 7 A 1/4 so far), ev-v2-finish 6/32.
 - **11:30** aa-v21 complete (plain vs plain, v2.1 pairs 7-8): pair 7 A 1/4, pair 8 A 0/4 again after the 2-1 split (v2.0 pair 8 was 0/8). Waiting for pairs 7-8 in ev-v2-base2/base3 before another rebalance (rule: lopsided in both). Partial, no verdicts: ev-v2-base2 9/13 new wins, ev-v2-finish 5/10, ev-v2-base3 3/4.
 - **12:00** Partial: ev-v2-base2 11/20 new wins, ev-v2-base3 7/8, ev-v2-finish 10/17. Early check ev-v2-finish vs ev-v2-base2+ev-v2-base3: -1.4k at 30:00 over 17 paired games (z -0.65, boundary -2.78): continue.
+- **13:02** ev-v2-finish COMPLETE: 20/32 new wins (judged once ev-v2-base2 and ev-v2-base3 are complete: keep rule needs complete baselines). Per pair A wins: 2 2 1 4 4 2 3 0 of 4. Pair 8 A has now lost 0/8 (v2.0) and 0/12 on v2.1 (aa-v21, finish, pending base runs): lopsided. Decision: do not change pair 8 while the v2.1 pool and two changes are measured on it (it only costs test power: those 4 games are near-certain halves); redesign it when the next pool is due. Started ev-v2-herofix (1-32, 5 at once, from ../oha-wt/herofix3; main has no bots/ or lineup change since its parent).
 
 ## Current state (updated 2026-11-18 05:45)
 
