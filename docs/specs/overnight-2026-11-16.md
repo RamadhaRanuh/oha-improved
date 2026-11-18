@@ -36,6 +36,7 @@
 - **10:30** smoke-finish PASS (game 1, ran to 40:50): 53 FINISH starts for the new team, none for the old; ends: 30 dead, 10 tower, 6 lost, 6 timeout, 1 hurt; 0 BEHAVIOR_ERROR. Merged smarter-bot-behaviour into wt/finish (9e702f0, lineups v2.1) and started ev-v2-finish (1-32, 5 at once, from ../oha-wt/finish); its games queue for ports behind ev-v2-base2 and aa-v21. ev-v2-base3 follows when aa-v21 ends.
 - **10:40** Second change: flag `herofix` on wt/herofix3 (165b8a6) combines the old herofix (lone_druid items, kez escape, hoodwink Scurry/acorn) and herofix2 (PA Strike/Blur escape, axe Culling Blade damage and reach) under one name; applied cleanly, build and check ok, flag off unchanged. Both halves passed smoke games before (11-17), so one combined smoke: smoke-herofix3, game 17 (new team plays 5A with kez and axe), queued for a port. Its eval follows ev-v2-finish.
 - **10:58** smoke-herofix3 PASS (game 17, to 42:28): new team kez escape 9, axe cull 12; nothing for the old team; 0 BEHAVIOR_ERROR. Started ev-v2-base3 (base, 1-32, 5 at once; queues for ports). herofix eval starts when ev-v2-base2 frees its slots. Progress: ev-v2-base2 8/32, aa-v21 5/8 (pair 7 A 1/4 so far), ev-v2-finish 6/32.
+- **11:30** aa-v21 complete (plain vs plain, v2.1 pairs 7-8): pair 7 A 1/4, pair 8 A 0/4 again after the 2-1 split (v2.0 pair 8 was 0/8). Waiting for pairs 7-8 in ev-v2-base2/base3 before another rebalance (rule: lopsided in both). Partial, no verdicts: ev-v2-base2 9/13 new wins, ev-v2-finish 5/10, ev-v2-base3 3/4.
 
 ## Current state (updated 2026-11-18 05:45)
 
