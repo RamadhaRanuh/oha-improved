@@ -33,12 +33,14 @@ Positions are listed 1 to 5, the order `Customize.Radiant_Heros` / `Dire_Heros` 
 | 5 | B | juggernaut | lina | mars | skywrath_mage | witch_doctor |
 | 6 | A | luna | death_prophet | centaur | lion | crystal_maiden |
 | 6 | B | medusa | sniper | tidehunter | hoodwink | lich |
-| 7 | A | phantom_assassin | zuus | legion_commander | jakiro | dazzle |
-| 7 | B | drow_ranger | viper | bristleback | shadow_shaman | vengefulspirit |
-| 8 | A | faceless_void | puck | primal_beast | marci | jakiro |
-| 8 | B | sven | dragon_knight | slardar | ogre_magi | witch_doctor |
+| 7 | A | phantom_assassin | viper | legion_commander | jakiro | dazzle |
+| 7 | B | drow_ranger | zuus | bristleback | shadow_shaman | vengefulspirit |
+| 8 | A | faceless_void | puck | primal_beast | ogre_magi | jakiro |
+| 8 | B | sven | dragon_knight | slardar | marci | witch_doctor |
 
 Predicted chance that lineup A beats B, OHA against OHA (sum of hero logits from `bots/FunLib/hero_win_rates.lua`): 1 0.51, 2 0.50, 3 0.48, 4 0.49, 5 0.49, 6 0.51, 7 0.41, 8 0.50.
+
+**Version 2.1 (2026-11-18 10:15):** the first check (aa-v2 plus ev-v2-base1, 8 games per pair) gave lineup A 2, 5, 2, 5, 6, 2, 1 and 0 wins of 8 in pairs 1-8. Pair 8 (A 0/8: puck, primal_beast and marci all on A) now splits those three heroes 2-1 (model 0.61 for A, since the model rates weak-list heroes from few clean games). Pair 7 (A 1/8) goes back to its version 1 split, where A won 29 of 68 (43%). Batches before 2.1 differ in games 25-32.
 
 ## Rotations
 
