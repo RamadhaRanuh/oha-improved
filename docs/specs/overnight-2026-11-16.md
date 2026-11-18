@@ -64,8 +64,9 @@
 - **15:35** ev-v2-herofix COMPLETE 15/32. `compare ev-v2-herofix ev-v2-base2+ev-v2-base3`: Gold -1.6k (95% -4.1k to +0.8k), inconclusive; at 10:00 -0.7k (-1.1k to -0.2k); adjusted for 10:00 +0.0k; paired wins -9 points (-32 to +14), inconclusive. **`herofix` NOT KEPT** by the rule; Friday candidate (real bug fixes). The 10:00 deficit is not the fixes: per game it comes mostly from games without any fixed hero on the new team (g15 pair 4 -4.3k, g3 pair 1B -2.1k), i.e. drift. Worktree removed (junction rmdir first; main node_modules intact), branch wt/herofix3 stays. Running: ev-v2-herofix2, ev-v2-base4.
 - **16:05** ev-v2-base4 at 12/31 (pool now about 48/95 = 51%, so the v2.1 base is near even with plain OHA). ev-v2-herofix2 early check over 13 games: -0.7k (z -0.30), continue. Day summary written at the top.
 - **16:16** User back. ev-v2-base4 COMPLETE 13/32; pool base2+base3+base4 = 49/96 (51%). ev-v2-herofix2 7/16, early -1.7k (z -0.85), continue. ev-v2-base5 queued behind it.
+- **16:20** User paused the project. Loop stopped; ev-v2-herofix2 (incomplete, 7/16, no verdict) and ev-v2-base5 (no games finished) stopped; no Dota processes left in WSL. wt/herofix4 worktree and all wt/* branches kept.
 
-## Current state (updated 2026-11-18 16:16)
+## Current state (updated 2026-11-18 16:20)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
@@ -73,7 +74,7 @@ How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -
 |---|---|
 | Base | `group,fixes,corefarm,roshsafe` for the goal (fixed lineups); `heropick` (909ab2b, free drafts only) is backlog; flags in code: arbiter, group, learned, fixes, corefarm, roshsafe, heropick; thresholds tunable with `--tune` |
 | Baselines | fixed lineups v2.1 (balanced, 2026-11-18): ev-v2-base2 + ev-v2-base3 = 36/64 (56%), ev-v2-base4 13/32; pool of three 49/96 (51%); aa-v2/ev-v2-base1 are v2.0; all earlier fixed-lineup batches not comparable; free drafts: dr-gfcr (15/32) |
-| In test | ev-v2-herofix2 (wt/herofix4 9c03263: puck coil, lane stand, tide item order), ev-v2-base4 |
+| In test | nothing (project paused 16:20; ev-v2-herofix2 stopped at 16 games, no verdict) |
 | Next | user decisions (day summary): fixed-lineup target; Friday build contents; Thursday: heropick variety + release config + test lobby |
 | Kept | `fixes` (user), `group`, `corefarm`, `roshsafe`, `heropick` |
 | Removed after a complete batch | `bail`, `yield`, `siegecut`, `noregroup`, `farmfree`, `fight`, `retreat`, `farm`, `escape`, `humanfeel`, `laning`, `roam` |
