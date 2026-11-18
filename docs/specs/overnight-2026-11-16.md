@@ -39,6 +39,7 @@
 - **11:30** aa-v21 complete (plain vs plain, v2.1 pairs 7-8): pair 7 A 1/4, pair 8 A 0/4 again after the 2-1 split (v2.0 pair 8 was 0/8). Waiting for pairs 7-8 in ev-v2-base2/base3 before another rebalance (rule: lopsided in both). Partial, no verdicts: ev-v2-base2 9/13 new wins, ev-v2-finish 5/10, ev-v2-base3 3/4.
 - **12:00** Partial: ev-v2-base2 11/20 new wins, ev-v2-base3 7/8, ev-v2-finish 10/17. Early check ev-v2-finish vs ev-v2-base2+ev-v2-base3: -1.4k at 30:00 over 17 paired games (z -0.65, boundary -2.78): continue.
 - **13:02** ev-v2-finish COMPLETE: 20/32 new wins (judged once ev-v2-base2 and ev-v2-base3 are complete: keep rule needs complete baselines). Per pair A wins: 2 2 1 4 4 2 3 0 of 4. Pair 8 A has now lost 0/8 (v2.0) and 0/12 on v2.1 (aa-v21, finish, pending base runs): lopsided. Decision: do not change pair 8 while the v2.1 pool and two changes are measured on it (it only costs test power: those 4 games are near-certain halves); redesign it when the next pool is due. Started ev-v2-herofix (1-32, 5 at once, from ../oha-wt/herofix3; main has no bots/ or lineup change since its parent).
+- **14:00** ev-v2-base3 complete 18/32; pool ev-v2-base2+ev-v2-base3 = 36/64 (56%) on v2.1. Pair 8 A over both: 2/4 and 0/4, so not clearly lopsided; kept. `compare ev-v2-finish ev-v2-base2+ev-v2-base3`: Gold -0.1k (95% -2.6k to +2.4k), inconclusive; adjusted for 10:00 +0.0k; paired wins +6 points (-10 to +23), inconclusive. **`finish` NOT KEPT** (needs Gold PASS); worktree removed, branch wt/finish stays. Retro (no gain this round): fight-level levers are about +1 kill/game, below what 32 games can show (95% about +-2.5k). Three analyses found play symmetric because both teams run the same hero scripts, so the remaining lever that is the new team's alone is per-hero script quality. Next: analyst audits the weakest lineup heroes (skywrath 0.24, kez, puck 0.31, hoodwink, centaur 0.39, sven 0.40, templar_assassin 0.41, primal_beast 0.43, witch_doctor 0.44) for concrete script defects, to batch fixes for several heroes behind one flag (`herofix` is the first such batch, running).
 
 ## Current state (updated 2026-11-18 05:45)
 
@@ -47,12 +48,12 @@ How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -
 | | |
 |---|---|
 | Base | `group,fixes,corefarm,roshsafe` for the goal (fixed lineups); `heropick` (909ab2b, free drafts only) is backlog; flags in code: arbiter, group, learned, fixes, corefarm, roshsafe, heropick; thresholds tunable with `--tune` |
-| Baselines | fixed lineups v2 (balanced, 2026-11-18): aa-v2 (plain vs plain) and ev-v2-base1 running; all earlier fixed-lineup batches not comparable; free drafts: dr-gfcr (15/32) |
+| Baselines | fixed lineups v2.1 (balanced, 2026-11-18): ev-v2-base2 + ev-v2-base3 = 36/64 (56%); aa-v2/ev-v2-base1 are v2.0; all earlier fixed-lineup batches not comparable; free drafts: dr-gfcr (15/32) |
 | In test | nothing running (loop stopped 05:45 for the user) |
 | Next | user decisions: Weak_Hero_Cap fix + fresh fixed-lineup baselines; merge herofix unflagged or not; next lever for the fixed-lineup 90% |
 | Kept | `fixes` (user), `group`, `corefarm`, `roshsafe`, `heropick` |
 | Removed after a complete batch | `bail`, `yield`, `siegecut`, `noregroup`, `farmfree`, `fight`, `retreat`, `farm`, `escape`, `humanfeel`, `laning`, `roam` |
-| Left off, code kept | `arbiter` (+0.7k, inconclusive), `learned` (parked), draft v1/v2 (wt/draft, wt/draft2), `herofix2` (wt/herofix2: PA escape, axe cull; -0.7k, inconclusive), `herofix` (wt/herofix: lone_druid, kez, hoodwink; 27/48, +0.7k, inconclusive) |
+| Left off, code kept | `finish` (wt/finish: chase low-hp enemies; v2.1 -0.1k, +6 points, inconclusive), `arbiter` (+0.7k, inconclusive), `learned` (parked), draft v1/v2 (wt/draft, wt/draft2), `herofix2` (wt/herofix2: PA escape, axe cull; -0.7k, inconclusive), `herofix` (wt/herofix: lone_druid, kez, hoodwink; 27/48, +0.7k, inconclusive) |
 | Where things stand | free drafts: 88/96 = 92% (dr-hp 58/64 + dr-hp2 30/32) with heropick vs 25/59 for the base on the same seeds; fixed lineups: base about 57% (73/127), herofix inconclusive (27/48) |
 
 The log below is chronological; the newest entries are at the end.
