@@ -7,7 +7,7 @@ Fixed lineup pairs for screen and confirm runs ([spec](smarter-bot-behaviour.md)
 - Every hero has a complete `BotLib` build: `sRoleItemsBuyList['pos_1']` to `['pos_5']` in `bots/BotLib/hero_<name>.lua`. Io (`hero_wisp.lua`) uses one shared build for all positions, which counts as complete.
 - Each hero sits in a position its `aba_hero_pos_weights.ts` row rates highly (one of its two highest weights).
 - Each side is a standard 1-5 composition: carry, mid, offlane, soft support, hard support.
-- Five of the nine override heroes (`Utils.BuggyHeroesDueToValveTooLazy`) appear: Lone Druid, Io, Primal Beast, Marci, Hoodwink. Section 11.2 asks for at least three.
+- Four of the nine override heroes (`Utils.BuggyHeroesDueToValveTooLazy`) appear: Io, Primal Beast, Marci, Hoodwink (version 1 also had Lone Druid). Section 11.2 asks for at least three.
 - **Screens use pairs 1 and 2.** Pair 2 holds Io (version 1 also had Lone Druid, dropped in version 2).
 - No hero from Appendix List A ("weak") in `Customize/general.lua` is used.
 
