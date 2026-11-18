@@ -28,7 +28,7 @@ Customize.Behavior = {
 
 A missing table or key counts as off.
 
-**Current base (2026-11-18, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe,heropick` (`heropick` acts only in free drafts; fixed lineups skip it). The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `arbiter` was inconclusive on the base, and `escape`, `humanfeel`, `laning` and `roam` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
+**Current base (2026-11-18, kept by eval batches against plain OHA):** `group,fixes,corefarm,roshsafe` for the goal (fixed lineups, where `heropick` does nothing). `heropick` stays in the code as backlog for free drafts (user, 2026-11-18). Since 2026-11-18 match-setup writes `Weak_Hero_Cap = 5` for fixed lineups, so every listed hero is played; batches before that are not comparable. The older recommended set (`arbiter`, `laning`, `group`, `roam`, `humanfeel`, `escape`, section 4a) predates those batches; `arbiter` was inconclusive on the base, and `escape`, `humanfeel`, `laning` and `roam` failed their screens and were removed (below). The fight/run decision is being replaced by a learned policy ([specs/learned-fight-decisions.md](specs/learned-fight-decisions.md)).
 
 | Flag | What it switches on | Main modules |
 |---|---|---|

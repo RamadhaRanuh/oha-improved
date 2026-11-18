@@ -196,6 +196,10 @@ general = replaceTable(
     "Behavior",
     `Customize.Behavior = {${nl}    Radiant = { ${flagRow(newTeam === "Radiant")} },${nl}    Dire    = { ${flagRow(newTeam === "Dire")} },${nl}}`
 );
+// Customize.Weak_Hero_Cap: 5 for fixed lineups, so hero_selection never swaps a listed "weak" hero
+// (at cap 1 it replaced the team's second weak hero in 39% of games); 1, the game default, for free drafts.
+if (!/\r?\nCustomize\.Weak_Hero_Cap = [^\r\n]*/.test(general)) fail("Could not find Customize.Weak_Hero_Cap in general.lua");
+general = general.replace(/(\r?\n)Customize\.Weak_Hero_Cap = [^\r\n]*/, `$1Customize.Weak_Hero_Cap = ${freeDraft ? 1 : 5}`);
 // Customize.Draft_Seed: set for --draft, removed otherwise (no seed: drafts as before).
 general = general.replace(/\r?\nCustomize\.Draft_Seed = [^\r\n]*/g, "");
 if (draftSeed !== null) general = general.replace(/\r?\nreturn Customize/, `${nl}Customize.Draft_Seed = ${draftSeed}${nl}return Customize`);

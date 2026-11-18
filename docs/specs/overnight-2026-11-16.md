@@ -21,14 +21,18 @@
 2. Fixed-lineup 90%: behaviour flags have not moved it; candidates are a gold-lead-labelled learned policy and the generic retreat (76% of all deaths happen in retreat mode, 46% with at most one ally near).
 3. Make heropick less predictable (sample among heroes within ~0.03 of the best) and test it against a stronger drafter.
 
+## 2026-11-18 (user back)
+
+- **07:22** User: the real goal is 90% on the fixed lineups; heropick goes to the backlog (code stays, not part of the goal's base). First fix: match-setup now writes `Weak_Hero_Cap = 5` for fixed lineups (1 for free drafts), so no listed hero is swapped. Fresh baselines ev-cap5-base1 and ev-cap5-base2 (`group,fixes,corefarm,roshsafe`, games 1-32, parallel 5 each) started to replace the old pool; first check: MATCHREC heroes equal the lineup doc in pair 2 (wisp), 3 (hoodwink, primal_beast) and 8 (puck, marci, primal_beast).
+
 ## Current state (updated 2026-11-18 05:45)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
-| Base | `group,fixes,corefarm,roshsafe,heropick` (heropick merged 909ab2b, acts only in free drafts); flags in code: arbiter, group, learned, fixes, corefarm, roshsafe, heropick; thresholds tunable with `--tune` |
-| Baselines | fixed lineups: ev-gfc-roshsafe2 (full, 20/32) + sc-gfcr-base (screen); free drafts: dr-gfcr (15/32) |
+| Base | `group,fixes,corefarm,roshsafe` for the goal (fixed lineups); `heropick` (909ab2b, free drafts only) is backlog; flags in code: arbiter, group, learned, fixes, corefarm, roshsafe, heropick; thresholds tunable with `--tune` |
+| Baselines | fixed lineups: ev-cap5-base1 + ev-cap5-base2 (started 2026-11-18, Weak_Hero_Cap 5; older fixed-lineup batches not comparable); free drafts: dr-gfcr (15/32) |
 | In test | nothing running (loop stopped 05:45 for the user) |
 | Next | user decisions: Weak_Hero_Cap fix + fresh fixed-lineup baselines; merge herofix unflagged or not; next lever for the fixed-lineup 90% |
 | Kept | `fixes` (user), `group`, `corefarm`, `roshsafe`, `heropick` |
