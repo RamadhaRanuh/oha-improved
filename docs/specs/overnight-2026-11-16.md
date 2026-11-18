@@ -2,7 +2,7 @@
 
 ## Day summary, 2026-11-18 (loop 07:20-17:00, user at work)
 
-**Headline: 90% on the fixed lineups is not in reach with behaviour flags.** On the new balanced v2.1 lineups the base (`group,fixes,corefarm,roshsafe`) wins about **52%** of games against plain OHA (ev-v2-base2 18/32, ev-v2-base3 18/32, ev-v2-base4 12/31 at 16:05: 48/95). Every change tested today moved the 30:00 gold lead by under 2k (90% needs about +12.8k), and analysts found fights, kills, retreat and spell use symmetric between the teams, because both run the same hero code. The 90% from free drafts (heropick, 92%) came from hero choice, which fixed lineups take away by design.
+**Headline: 90% on the fixed lineups is not in reach with behaviour flags.** On the new balanced v2.1 lineups the base (`group,fixes,corefarm,roshsafe`) wins about **51%** of games against plain OHA (ev-v2-base2 18/32, ev-v2-base3 18/32, ev-v2-base4 13/32: 49/96, 95% range about 41-61%). Every change tested today moved the 30:00 gold lead by under 2k (90% needs about +12.8k), and analysts found fights, kills, retreat and spell use symmetric between the teams, because both run the same hero code. The 90% from free drafts (heropick, 92%) came from hero choice, which fixed lineups take away by design.
 
 **What ran**
 1. Lineups rebuilt (your choice "rebalance"): Weak_Hero_Cap = 5 for fixed lineups (faa7719), so every game plays the listed heroes (checked in pairs 2, 3, 8). v2 balanced pairs (d1c7e7e), then v2.1 (b2e3486) after pairs 7-8 came out lopsided in plain-vs-plain games. Old fixed-lineup batches are not comparable any more.
@@ -63,15 +63,16 @@
 - **15:05** herofix2 tightened (9c03263: with an enemy hero within 900 the lane stand needs hp > 0.6 and allies >= enemies, stand spot at full attack range; the implementer confirmed the 3 earlier deaths came from the stand walking a 33-45% hp Primal Beast back to the wave). smoke-herofix4b PASS (game 29): puck coil 20; Primal Beast lh10 14 (first smoke 7, v2.1 mean 10.7) with 2 lane deaths before 8:00 (was 3). One game; kept the stand. Started ev-v2-herofix2 (1-32, 5 at once, from ../oha-wt/herofix4). ev-v2-herofix 14/29, ev-v2-base4 6/16.
 - **15:35** ev-v2-herofix COMPLETE 15/32. `compare ev-v2-herofix ev-v2-base2+ev-v2-base3`: Gold -1.6k (95% -4.1k to +0.8k), inconclusive; at 10:00 -0.7k (-1.1k to -0.2k); adjusted for 10:00 +0.0k; paired wins -9 points (-32 to +14), inconclusive. **`herofix` NOT KEPT** by the rule; Friday candidate (real bug fixes). The 10:00 deficit is not the fixes: per game it comes mostly from games without any fixed hero on the new team (g15 pair 4 -4.3k, g3 pair 1B -2.1k), i.e. drift. Worktree removed (junction rmdir first; main node_modules intact), branch wt/herofix3 stays. Running: ev-v2-herofix2, ev-v2-base4.
 - **16:05** ev-v2-base4 at 12/31 (pool now about 48/95 = 51%, so the v2.1 base is near even with plain OHA). ev-v2-herofix2 early check over 13 games: -0.7k (z -0.30), continue. Day summary written at the top.
+- **16:16** User back. ev-v2-base4 COMPLETE 13/32; pool base2+base3+base4 = 49/96 (51%). ev-v2-herofix2 7/16, early -1.7k (z -0.85), continue. ev-v2-base5 queued behind it.
 
-## Current state (updated 2026-11-18 16:05)
+## Current state (updated 2026-11-18 16:16)
 
 How a round works: [../TESTING.md](../TESTING.md). Every batch: `npm run batch -- ledger`.
 
 | | |
 |---|---|
 | Base | `group,fixes,corefarm,roshsafe` for the goal (fixed lineups); `heropick` (909ab2b, free drafts only) is backlog; flags in code: arbiter, group, learned, fixes, corefarm, roshsafe, heropick; thresholds tunable with `--tune` |
-| Baselines | fixed lineups v2.1 (balanced, 2026-11-18): ev-v2-base2 + ev-v2-base3 = 36/64 (56%), ev-v2-base4 12/31 at 16:05 (pool about 51%); aa-v2/ev-v2-base1 are v2.0; all earlier fixed-lineup batches not comparable; free drafts: dr-gfcr (15/32) |
+| Baselines | fixed lineups v2.1 (balanced, 2026-11-18): ev-v2-base2 + ev-v2-base3 = 36/64 (56%), ev-v2-base4 13/32; pool of three 49/96 (51%); aa-v2/ev-v2-base1 are v2.0; all earlier fixed-lineup batches not comparable; free drafts: dr-gfcr (15/32) |
 | In test | ev-v2-herofix2 (wt/herofix4 9c03263: puck coil, lane stand, tide item order), ev-v2-base4 |
 | Next | user decisions (day summary): fixed-lineup target; Friday build contents; Thursday: heropick variety + release config + test lobby |
 | Kept | `fixes` (user), `group`, `corefarm`, `roshsafe`, `heropick` |
