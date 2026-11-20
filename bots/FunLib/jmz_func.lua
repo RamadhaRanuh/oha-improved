@@ -5698,6 +5698,21 @@ function J.IsMeepoClone(hero)
 	if J.IsValidHero(hero)
 	and hero:GetUnitName() == 'npc_dota_hero_meepo'
 	then
+		-- Allied Meepo: the player's own hero is the one GetTeamMember returns; any other Meepo is a clone.
+		-- (7.42 clones carry item copies, so the boots-only check below took a clone for the real Meepo
+		-- and it tried to buy items every second.)
+		if hero:GetTeam() == GetTeam()
+		then
+			for i = 1, #GetTeamPlayers( GetTeam() )
+			do
+				local member = GetTeamMember( i )
+				if member ~= nil and member:GetUnitName() == 'npc_dota_hero_meepo'
+				then
+					return member ~= hero
+				end
+			end
+		end
+
 		for i = 0, 5
 		do
 			local hItem = hero:GetItemInSlot(i)

@@ -82,9 +82,120 @@ end
 
 -- Cast Spells
 
+local tWarnedNoSpellFunc = {}
 X.ConsiderSpellUsage['default'] = function (hMinionUnit, ability)
-    print("[WARN] No function for the usage of ability: " .. ability:GetName() .. ', for unit owned by: ' .. bot:GetUnitName())
+    if not tWarnedNoSpellFunc[ability:GetName()] then
+        tWarnedNoSpellFunc[ability:GetName()] = true
+        print("[WARN] No function for the usage of ability: " .. ability:GetName() .. ', for unit owned by: ' .. bot:GetUnitName())
+    end
     return 0, nil, nil
+end
+
+-- 7.42 creep and summon abilities ---------------------------------------------------
+
+-- Point-target nukes and stuns of dominated or persuaded creeps: cast at the owner's fight target.
+local function ConsiderPointNukeAtTarget(hMinionUnit, ability, nFallbackRange)
+    local nCastRange = ability:GetCastRange()
+    if nCastRange == nil or nCastRange <= 0 then nCastRange = nFallbackRange end
+
+    if J.IsGoingOnSomeone(bot) or J.IsInTeamFight(bot, 1200) then
+        if J.IsValidHero(botTarget)
+        and J.CanCastOnNonMagicImmune(botTarget)
+        and J.IsInRange(hMinionUnit, botTarget, nCastRange)
+        and not J.IsSuspiciousIllusion(botTarget)
+        then
+            return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation(), 'point'
+        end
+    end
+
+    for _, enemyHero in pairs(nEnemyHeroes) do
+        if J.IsValidHero(enemyHero)
+        and J.CanCastOnNonMagicImmune(enemyHero)
+        and J.IsInRange(hMinionUnit, enemyHero, nCastRange)
+        and enemyHero:GetAttackTarget() == hMinionUnit
+        then
+            return BOT_ACTION_DESIRE_HIGH, enemyHero:GetLocation(), 'point'
+        end
+    end
+
+    return BOT_ACTION_DESIRE_NONE, nil, nil
+end
+
+X.ConsiderSpellUsage['mud_golem_hurl_big_boulder'] = function (hMinionUnit, ability)
+    return ConsiderPointNukeAtTarget(hMinionUnit, ability, 800)
+end
+
+X.ConsiderSpellUsage['eimermole_miners_slam'] = function (hMinionUnit, ability)
+    return ConsiderPointNukeAtTarget(hMinionUnit, ability, 300)
+end
+
+X.ConsiderSpellUsage['radigull_eggstremism'] = function (hMinionUnit, ability)
+    return ConsiderPointNukeAtTarget(hMinionUnit, ability, 400)
+end
+
+X.ConsiderSpellUsage['frogmen_arm_of_the_deep'] = function (hMinionUnit, ability)
+    return ConsiderPointNukeAtTarget(hMinionUnit, ability, 275)
+end
+
+-- Frogmen Water Bubble: magic-damage barrier on a hurt ally hero.
+X.ConsiderSpellUsage['frogmen_water_bubble_small'] = function (hMinionUnit, ability)
+    local nCastRange = ability:GetCastRange()
+    for _, allyHero in pairs(nAllyHeroes) do
+        if J.IsValidHero(allyHero)
+        and J.IsInRange(hMinionUnit, allyHero, nCastRange)
+        and allyHero:WasRecentlyDamagedByAnyHero(2)
+        and J.GetHP(allyHero) < 0.6
+        and not allyHero:IsIllusion()
+        then
+            return BOT_ACTION_DESIRE_HIGH, allyHero, 'unit'
+        end
+    end
+    return BOT_ACTION_DESIRE_NONE, nil, nil
+end
+
+-- Beastmaster's hawk: Dive Bomb (enemy unit target, roots). Dive at the fight target.
+X.ConsiderSpellUsage['beastmaster_hawk_dive'] = function (hMinionUnit, ability)
+    if J.IsGoingOnSomeone(bot) or J.IsInTeamFight(bot, 1200) then
+        if J.IsValidHero(botTarget)
+        and J.CanCastOnNonMagicImmune(botTarget)
+        and J.IsInRange(bot, botTarget, 1200)
+        and not J.IsSuspiciousIllusion(botTarget)
+        and not J.IsDisabled(botTarget)
+        then
+            return BOT_ACTION_DESIRE_HIGH, botTarget, 'unit'
+        end
+    end
+    return BOT_ACTION_DESIRE_NONE, nil, nil
+end
+
+-- Chen's Zealot: Martyrdom sacrifices the Zealot (it can be resurrected by Chen's Zealot active).
+-- Use it when the Zealot is about to die anyway: damage an enemy hero, or heal a dying ally hero.
+X.ConsiderSpellUsage['chen_martyrdom'] = function (hMinionUnit, ability)
+    if thisMinionHP > 0.25 then return BOT_ACTION_DESIRE_NONE, nil, nil end
+    local nCastRange = ability:GetCastRange()
+
+    for _, allyHero in pairs(nAllyHeroes) do
+        if J.IsValidHero(allyHero)
+        and J.IsInRange(hMinionUnit, allyHero, nCastRange)
+        and J.GetHP(allyHero) < 0.3
+        and allyHero:WasRecentlyDamagedByAnyHero(2)
+        and not allyHero:IsIllusion()
+        then
+            return BOT_ACTION_DESIRE_HIGH, allyHero, 'unit'
+        end
+    end
+
+    for _, enemyHero in pairs(nEnemyHeroes) do
+        if J.IsValidHero(enemyHero)
+        and J.CanCastOnNonMagicImmune(enemyHero)
+        and J.IsInRange(hMinionUnit, enemyHero, nCastRange)
+        and not J.IsSuspiciousIllusion(enemyHero)
+        then
+            return BOT_ACTION_DESIRE_HIGH, enemyHero, 'unit'
+        end
+    end
+
+    return BOT_ACTION_DESIRE_NONE, nil, nil
 end
 
 -- Tornado
