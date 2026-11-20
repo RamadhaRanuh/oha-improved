@@ -2,7 +2,7 @@
 
 This is a step-by-step runbook for quickly updating the bot scripts when Valve releases a new Dota 2 patch. Designed to be followed by a developer or AI assistant without needing to re-read the entire codebase.
 
-**Last updated for:** Patch 7.41a (March 2026)
+**Last updated for:** Patch 7.42 (November 2026). Assessment and spec: `docs/wayfinder/patch-7-42/`, `docs/specs/patch-7-42.md`
 
 ---
 
@@ -487,3 +487,11 @@ Things we missed on the first pass and had to fix later:
 3. **New abilities replacing old slots** (OD's Objurgation) -- we checked some heroes but not all
 4. **Special skill progression** (Meepo ult levels) -- we didn't check non-standard heroes
 5. **Patch note inaccuracy** -- issue #129's AI-generated list had wrong info (Lina/Sven innates, "Snakebite", "Reprimand" name). Always verify on Liquipedia.
+
+## Lessons Learned (7.42)
+
+1. **Innate changes can be missing from the patch notes.** Beastmaster's Inner Beast became an innate that cannot be levelled, and the skill build kept trying to level it (over 1,000 skipped level-ups per game). Diff the d2vpkr hero KV ability flags between the old and new game builds (`AbilityBehavior`, `Innate`, `MaxLevel`) instead of trusting the notes.
+2. **Removed items stay in `items.txt`.** Khanda and Helm of the Overlord still resolve through `GetItemCost`/`GetItemComponents`, but the shop refuses them, so builds stalled silently. Check the shop lists (`shops.txt`), not `items.txt`. `item_purchase_generic.lua` now drops items the shop refuses (invalid or disallowed result).
+3. **Hero-file Lua errors are swallowed.** A nil ability (Meepo's removed Megameepo, Chen's long-gone Summon Convert) aborted the whole `SkillsComplement`, so later spells never cast, yet no "Script Runtime Error" appeared and smoke checks passed. Nil-guard every ability fetched by name, and judge hero fixes by cast lines, levels and inventory changes in the logs.
+4. **Skill builds index a runtime list.** An ability that leaves a slot (Juggernaut's Swift Slash) leaves `generic_hidden` behind; code that assumed the old ability must check the name. An ability already at max level is now dropped from the level-up queue instead of blocking it.
+5. **Neutral tiers can change shape.** 7.42 has 4 tiers; every 5-slot array in Buff and FretBots (`maxPerTier`, `timings`, `tierAwards`) had to shrink with it.
