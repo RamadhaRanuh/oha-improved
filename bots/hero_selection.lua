@@ -1239,6 +1239,16 @@ if Customize then
 			playerNameOverrides.Dire[i] = Utils.TrimString(Customize.Dire_Names[i])
 		end
 	end
+	-- Pub-style names for every 'Random' slot (no team tag, no pro name, no .OHA suffix).
+	if Customize.Human_Like_Names then
+		local PubNames = require( GetScriptDirectory()..'/FunLib/pub_names' )
+		local side = GetTeam() == TEAM_RADIANT and 'Radiant' or 'Dire'
+		local picked = PubNames.Pick(5, GetTeam())
+		for i = 1, 5 do
+			local cur = playerNameOverrides[side][i]
+			if cur == nil or cur == '' or cur == 'Random' then playerNameOverrides[side][i] = picked[i] end
+		end
+	end
 end
 
 local teamPlayerNames = Dota2Teams.generateTeams(playerNameOverrides)

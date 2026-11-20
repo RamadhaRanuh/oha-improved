@@ -18,6 +18,8 @@
         "build:node": "tsc -p tsconfig-node.json",
         "build": "npm run build:lua",
         "check": "node ./typescript/post-process/check.js",
+        "test": "node ./typescript/tests/talk.test.js",
+        "fun": "node ./typescript/post-process/fun.js",
         "diagnose": "node ./typescript/post-process/diagnose.js",
         "herorates": "node ./typescript/post-process/hero-rates.js",
         "dev": "tstl -p tsconfig-tstl.json --watch",

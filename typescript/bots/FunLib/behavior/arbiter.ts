@@ -10,6 +10,8 @@ import { BotMode, Unit } from "bots/ts_libs/dota";
 import { IsOn } from "./flags";
 import * as jmz from "bots/FunLib/jmz_func";
 import * as Group from "./group";
+import * as Persona from "./persona";
+import * as Mood from "./mood";
 
 /** Errors in the group cap print once each and leave the desire unchanged. */
 const groupErrors: Record<string, boolean> = {};
@@ -68,15 +70,46 @@ export function Finalize(bot: Unit, mode: BotMode, raw: number | undefined): num
     return value;
 }
 
+/** Errors in the persona / mood scaling print once each and leave the desire unchanged. */
+const personaErrors: Record<string, boolean> = {};
+
+function ScaleFactor(bot: Unit, mode: BotMode, persona: boolean, mood: boolean): number {
+    let f = 1;
+    if (persona) f *= Persona.Factor(bot, mode);
+    if (mood) f *= Mood.Factor(bot, mode);
+    return f;
+}
+
+/**
+ * Behaviour flags `persona` and `mood`: the bot's hidden persona and its current mood scale the raw desire
+ * (behavior/persona, behavior/mood), within the limits of Persona.ApplyFactor.
+ */
+function PersonaScale(bot: Unit, mode: BotMode, raw: number | undefined, persona: boolean, mood: boolean): number | undefined {
+    if (raw === undefined) return raw;
+    const [ok, factor] = pcall(ScaleFactor, bot, mode, persona, mood);
+    if (ok) return Persona.ApplyFactor(raw, factor as number);
+    if (!personaErrors[`${factor}`]) {
+        personaErrors[`${factor}`] = true;
+        print(`BEHAVIOR_ERROR persona team=${GetTeam()} t=${Math.floor(DotaTime())} ${factor}`);
+    }
+    return raw;
+}
+
 /**
  * Returns the GetDesire the engine should see for this mode file.
- * Flag off (or no GetDesire defined): returns `getDesire` itself, unchanged.
+ * Flags `arbiter`, `persona` and `mood` off (or no GetDesire defined): returns `getDesire` itself, unchanged.
  */
 export function Wrap(
     bot: Unit,
     mode: BotMode,
     getDesire: ((this: void) => number | undefined) | undefined
 ): ((this: void) => number | undefined) | undefined {
-    if (getDesire === undefined || !IsOn("arbiter")) return getDesire;
-    return () => Finalize(bot, mode, getDesire());
+    if (getDesire === undefined) return getDesire;
+    const arbiter = IsOn("arbiter");
+    const scaled = Persona.KnobOf(mode) !== undefined;
+    const persona = scaled && IsOn("persona");
+    const mood = scaled && IsOn("mood");
+    if (!persona && !mood) return arbiter ? () => Finalize(bot, mode, getDesire()) : getDesire;
+    if (!arbiter) return () => PersonaScale(bot, mode, getDesire(), persona, mood);
+    return () => Finalize(bot, mode, PersonaScale(bot, mode, getDesire(), persona, mood));
 }

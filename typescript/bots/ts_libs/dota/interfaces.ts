@@ -147,6 +147,7 @@ export interface Unit {
     WasRecentlyDamagedByHero(hero: Unit, delta: number): boolean;
     WasRecentlyDamagedByTower(delta: number): boolean;
     WasRecentlyDamagedByCreep(delta: number): boolean;
+    WasRecentlyDamagedByPlayer(playerId: number, delta: number): boolean;
     GetMaxHealth(): number;
     GetHealth(): number;
     GetRawOffensivePower(): number;

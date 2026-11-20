@@ -6,6 +6,8 @@ local ____flags = require(GetScriptDirectory().."/FunLib/behavior/flags")
 local IsOn = ____flags.IsOn
 local jmz = require(GetScriptDirectory().."/FunLib/jmz_func")
 local Group = require(GetScriptDirectory().."/FunLib/behavior/group")
+local Persona = require(GetScriptDirectory().."/FunLib/behavior/persona")
+local Mood = require(GetScriptDirectory().."/FunLib/behavior/mood")
 --- Errors in the group cap print once each and leave the desire unchanged.
 local groupErrors = {}
 --- Added to the running mode's desire so it must be beaten clearly before it is replaced. Tunable.
@@ -49,16 +51,76 @@ function ____exports.Finalize(bot, mode, raw)
     end
     return value
 end
+--- Errors in the persona / mood scaling print once each and leave the desire unchanged.
+local personaErrors = {}
+local function ScaleFactor(bot, mode, persona, mood)
+    local f = 1
+    if persona then
+        f = f * Persona.Factor(bot, mode)
+    end
+    if mood then
+        f = f * Mood.Factor(bot, mode)
+    end
+    return f
+end
+--- Behaviour flags `persona` and `mood`: the bot's hidden persona and its current mood scale the raw desire
+-- (behavior/persona, behavior/mood), within the limits of Persona.ApplyFactor.
+local function PersonaScale(bot, mode, raw, persona, mood)
+    if raw == nil then
+        return raw
+    end
+    local ok, factor = pcall(
+        ScaleFactor,
+        bot,
+        mode,
+        persona,
+        mood
+    )
+    if ok then
+        return Persona.ApplyFactor(raw, factor)
+    end
+    if not personaErrors[factor] then
+        personaErrors[factor] = true
+        print((((("BEHAVIOR_ERROR persona team=" .. tostring(GetTeam())) .. " t=") .. tostring(math.floor(DotaTime()))) .. " ") .. factor)
+    end
+    return raw
+end
 --- Returns the GetDesire the engine should see for this mode file.
--- Flag off (or no GetDesire defined): returns `getDesire` itself, unchanged.
+-- Flags `arbiter`, `persona` and `mood` off (or no GetDesire defined): returns `getDesire` itself, unchanged.
 function ____exports.Wrap(bot, mode, getDesire)
-    if getDesire == nil or not IsOn("arbiter") then
+    if getDesire == nil then
         return getDesire
+    end
+    local arbiter = IsOn("arbiter")
+    local scaled = Persona.KnobOf(mode) ~= nil
+    local persona = scaled and IsOn("persona")
+    local mood = scaled and IsOn("mood")
+    if not persona and not mood then
+        return arbiter and (function() return ____exports.Finalize(
+            bot,
+            mode,
+            getDesire()
+        ) end) or getDesire
+    end
+    if not arbiter then
+        return function() return PersonaScale(
+            bot,
+            mode,
+            getDesire(),
+            persona,
+            mood
+        ) end
     end
     return function() return ____exports.Finalize(
         bot,
         mode,
-        getDesire()
+        PersonaScale(
+            bot,
+            mode,
+            getDesire(),
+            persona,
+            mood
+        )
     ) end
 end
 return ____exports

@@ -10,6 +10,9 @@ local bDebugMode = ( 10 == 10 )
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func' )
 local Utils = require( GetScriptDirectory()..'/FunLib/utils' )
 local Thrash = require( GetScriptDirectory()..'/FunLib/behavior/thrash' )
+-- Flag `smartchat`: behavior/talk replaces X.SetTalkMessage (canned replies and taunts) for this team.
+local bSmartChat = require( GetScriptDirectory()..'/FunLib/behavior/flags' ).IsOn( 'smartchat' )
+local Talk = bSmartChat and require( GetScriptDirectory()..'/FunLib/behavior/talk' ) or nil
 -- Flag `fixes`: some item considers below read undefined globals (botLocation, nEnemyHeroes, ...).
 -- With the flag on they get real values; with it off they read the same globals as before.
 local bFixes = require( GetScriptDirectory()..'/FunLib/behavior/flags' ).IsOn( 'fixes' )
@@ -556,7 +559,7 @@ end
 local function BuybackUsageComplement()
 	if J.IsMeepoClone(bot) then return end
 
-	X.SetTalkMessage()
+	if not bSmartChat then X.SetTalkMessage() end
 
 	if bot:GetLevel() <= 15
 		or bot:HasModifier( 'modifier_arc_warden_tempest_double' )
@@ -8459,6 +8462,10 @@ function CourierUsageThink()
 	if bot.lastCourierFrameProcessTime == nil then bot.lastCourierFrameProcessTime = DotaTime() end
 	if DotaTime() > 30 and (DotaTime() - bot.lastCourierFrameProcessTime < 0.5) then return end
 	bot.lastCourierFrameProcessTime = DotaTime()
+	if Talk ~= nil and not bot:IsIllusion() and not J.IsMeepoClone(bot) then
+		local ok, err = pcall(Talk.Tick, bot)
+		if not ok then print('BEHAVIOR_ERROR smartchat team='..GetTeam()..' t='..math.floor(DotaTime())..' '..tostring(err)) end
+	end
 	if not bot:IsIllusion() then CourierUsageComplement() end
 end
 

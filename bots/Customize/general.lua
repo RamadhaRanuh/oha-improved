@@ -3,8 +3,8 @@ This is a place for you to customize the Open Hyper AI bots.
 
 1. When modiftying this file, be VERY careful to the spelling, punctuation and variable names - it's very easy to cause 
    syntax errors and mess up the entire logic for all bots, and could be hard for you to debug.
-2. In the case you saw the bots having some random names or picks (heroes not what you have set or without "OHA" name suffix), 
-   that means you had made some mistakes/errors while modifying this file. 
+2. In the case you saw the bots having some random names or picks (heroes not what you have set or without "OHA" name suffix
+   while Customize.Human_Like_Names is false), that means you had made some mistakes/errors while modifying this file.
 3. In any case this file got messed up and caused the bots to malfunction, you can try to restore the file. Either you have a 
    copy to replace, or resubscribe the script, or download from github.
 4. To avoid these customize files from getting overridden by workshop updates, you can copy 
@@ -78,11 +78,13 @@ Customize.Strict_Ban_Match = true
 Customize.Allow_Trash_Talk = true
 
 -- To allow bots response with GPT generated text to your chats in global channel. Disable Allow_Trash_Talk can disable this.
-Customize.Allow_AI_GPT_Response = true
+-- Off: it sends your chat, player names and Steam IDs to a third-party server, and the `smartchat` behaviour flag replies offline.
+Customize.Allow_AI_GPT_Response = false
 
 -- Set the level of bots' trash talks. Disable Allow_Trash_Talk can disable this.
 -- 1 => no trash talks from ally bots, no taunt from enemy after it gets a kill. 2 => ally bots also trash talk to you, allow taunt from enemy after it gets a kill.
-Customize.Trash_Talk_Level = 1
+-- 3 => (teams with the `smartchat` behaviour flag) also the harsh lines: swearing, mom jokes, touch-grass roasts. Your own lines go in Customize/trash_talk.lua.
+Customize.Trash_Talk_Level = 3
 
 -- To set the names for the Radiant bots. Don't need to provide a value for all 5 bots, missing names will have a Random value.
 Customize.Radiant_Names = {
@@ -94,6 +96,10 @@ Customize.Radiant_Names = {
 Customize.Dire_Names = {
     'Random',
 }
+
+-- true: every 'Random' name above becomes a pub-style player name ("sad boi", "Kevin", "mid or feed"),
+-- with no team tag, pro player name or ".OHA" suffix, so the bots read like human players.
+Customize.Human_Like_Names = true
 
 -- The desire level that the bots will group up and push the same lane. 
 -- 1 is mild meaning bots will group up only when convenient; 3 is bots will almost always try to push together.

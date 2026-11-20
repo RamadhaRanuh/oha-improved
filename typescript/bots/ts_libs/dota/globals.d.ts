@@ -62,6 +62,8 @@ declare global {
     function GetAncient(team: Team): Unit;
     function GetHeroKills(playerId: number): number;
     function GetHeroDeaths(playerId: number): number;
+    /** Bot VM chat hook: called for every chat message the team can see (one callback per VM). */
+    function InstallChatCallback(callback: (this: void, chat: { player_id: number; string: string; team_only: boolean }) => void): void;
     function GetNeutralSpawners(): any;
     /** Location `amount` (0..1) along the lane; which end is 0 is not documented, so callers check. */
     function GetLocationAlongLane(lane: Lane, amount: number): Vector;
