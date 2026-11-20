@@ -1465,23 +1465,12 @@ X.ConsiderItemDesire["item_blink"] = function( hItem )
 		nCastRange = nCastRange + 100
 	end
 
+	-- 7.42: Keen-eyed is +100 (tier 2) / +120 (tier 3); Mystical has no cast range; Boundless left the pool
 	if J.HasItemInInventory('item_enhancement_keen_eyed') then
-		if DotaTime() >= (J.IsModeTurbo() and 7.5*60 or 15*60) then
-			nCastRange = nCastRange + 125
-		elseif DotaTime() >= (J.IsModeTurbo() and 12.5*60 or 25*60) then
-			nCastRange = nCastRange + 135
-		end
-	end
-
-	if J.HasItemInInventory('item_enhancement_mystical') then
-		if DotaTime() >= (J.IsModeTurbo() and 17.5*60 or 35*60) then
+		if DotaTime() >= (J.IsModeTurbo() and 15*60 or 30*60) then
+			nCastRange = nCastRange + 120
+		elseif DotaTime() >= (J.IsModeTurbo() and 7.5*60 or 15*60) then
 			nCastRange = nCastRange + 100
-		end
-	end
-
-	if J.HasItemInInventory('item_enhancement_boundless') then
-		if DotaTime() >= (J.IsModeTurbo() and 30*60 or 60*60) then
-			nCastRange = nCastRange + 350
 		end
 	end
 
@@ -2891,7 +2880,7 @@ end
 --天堂
 X.ConsiderItemDesire["item_heavens_halberd"] = function( hItem )
 
-	local nCastRange = 700 + aetherRange
+	local nCastRange = 500 + aetherRange -- 7.42: cast range 500
 	local sCastType = 'unit'
 	local hEffectTarget = nil
 	local sCastMotive = nil
@@ -6230,8 +6219,10 @@ X.ConsiderItemDesire["item_flicker"] = function( hItem )
 	end
 
 
+	-- 7.42: Flicker does not move the hero if it took hero damage in the last 3 s,
+	-- so on retreat use it only when that window is clear
 	if J.IsRetreating( bot )
-		and bot:WasRecentlyDamagedByAnyHero( 3.0 )
+		and not bot:WasRecentlyDamagedByAnyHero( 3.0 )
 		and #nInRangeEnmyList >= 1
 	then
 		hEffectTarget = bot
@@ -6239,6 +6230,34 @@ X.ConsiderItemDesire["item_flicker"] = function( hItem )
 		return BOT_ACTION_DESIRE_HIGH, hEffectTarget, sCastType, sCastMotive
 	end
 
+
+	return BOT_ACTION_DESIRE_NONE
+
+end
+
+-- 7.42 Brick: unit target enemy, range 600, physical damage plus extra damage to barriers.
+-- The API cannot read barriers, so target the fight target, else the weakest enemy hero in range.
+X.ConsiderItemDesire["item_brick"] = function( hItem )
+
+	local nCastRange = 600 + aetherRange
+
+	if J.IsGoingOnSomeone( bot ) or J.IsInTeamFight( bot, 1200 )
+	then
+		if J.IsValidHero( botTarget )
+			and J.IsInRange( bot, botTarget, nCastRange )
+			and J.CanCastOnNonMagicImmune( botTarget )
+			and not J.IsSuspiciousIllusion( botTarget )
+		then
+			return BOT_ACTION_DESIRE_HIGH, botTarget, 'unit', 'brick target'
+		end
+
+		local hWeakest = J.GetVulnerableWeakestUnit( bot, true, true, nCastRange )
+		if J.IsValidHero( hWeakest )
+			and not J.IsSuspiciousIllusion( hWeakest )
+		then
+			return BOT_ACTION_DESIRE_HIGH, hWeakest, 'unit', 'brick weakest'
+		end
+	end
 
 	return BOT_ACTION_DESIRE_NONE
 
@@ -8447,6 +8466,17 @@ function X.SetAbilityItemList(heroAbility, items, abilityLvlup)
 end
 
 X.AbilityLevelUpThink = AbilityLevelUpThink
+-- 7.42: Witchbane is a point AoE item (range 700, radius 300): keep its targeting, cast at the target's position
+local fConsiderWitchbaneUnit = X.ConsiderItemDesire["item_heavy_blade"]
+X.ConsiderItemDesire["item_heavy_blade"] = function( hItem )
+	local nDesire, hTarget, sCastType, sMotive = fConsiderWitchbaneUnit( hItem )
+	if nDesire ~= nil and nDesire > 0 and type( hTarget ) == 'table' and hTarget.GetLocation ~= nil
+	then
+		return nDesire, hTarget:GetLocation(), 'ground', sMotive
+	end
+	return nDesire, hTarget, sCastType, sMotive
+end
+
 X.BuybackUsageThink = BuybackUsageThink
 X.AbilityUsageThink = AbilityUsageThink
 X.ItemUsageThink = ItemUsageThink
