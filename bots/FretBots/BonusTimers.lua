@@ -59,9 +59,10 @@ local maxTier = 5
 -- Per Minute Timer Interval
 local perMinuteTimerInterval = 60
 -- amount of neutrals found per tier
+-- 7.42: four neutral tiers (IsFindingDone compares each slot with maxPerTier)
 local tierAwards = {
-	[2] = {0,0,0,0,0},
-	[3] = {0,0,0,0,0}
+	[2] = {0,0,0,0},
+	[3] = {0,0,0,0}
 }
 -- current neutral items available to dole
 NeutralStash = {
