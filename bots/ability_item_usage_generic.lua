@@ -331,6 +331,10 @@ local function AbilityLevelUpComplement()
 		elseif string.find( abilityName, 'special_bonus' ) ~= nil
 			and sAbilityLevelUpList[2] ~= nil
 			and string.find( sAbilityLevelUpList[2], 'special_bonus' ) == nil
+			and bot:GetAbilityByName( sAbilityLevelUpList[2] ) ~= nil
+			and bot:GetAbilityByName( sAbilityLevelUpList[2] ):CanAbilityBeUpgraded()
+			and not bot:GetAbilityByName( sAbilityLevelUpList[2] ):IsHidden()
+			and botLevel >= bot:GetAbilityByName( sAbilityLevelUpList[2] ):GetHeroLevelRequiredToUpgrade()
 		then
 			-- a talent that is not available yet (e.g. Invoker reaches it at level 9): level the next ability first
 			sAbilityLevelUpList[1], sAbilityLevelUpList[2] = sAbilityLevelUpList[2], sAbilityLevelUpList[1]

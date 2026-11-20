@@ -186,12 +186,6 @@ function X.SkillsComplement()
         return
     end
 
-    if J.CanCastAbility(Zealot) and not J.IsRetreating(bot)
-    then
-        bot:Action_UseAbility(Zealot)
-        return
-    end
-
     HolyPersuasionDesire, HolyPersuasionTarget = X.ConsiderHolyPersuasion()
     if HolyPersuasionDesire > 0
     then
@@ -203,6 +197,13 @@ function X.SkillsComplement()
     if DivineFavorDesire > 0
     then
         bot:Action_UseAbilityOnEntity(DivineFavor, DivineFavorTarget)
+        return
+    end
+
+    -- 7.42 Zealot active (resurrects the anointed Zealot): lowest priority, so it never pre-empts the other spells
+    if J.CanCastAbility(Zealot) and not J.IsRetreating(bot)
+    then
+        bot:Action_UseAbility(Zealot)
         return
     end
 end
