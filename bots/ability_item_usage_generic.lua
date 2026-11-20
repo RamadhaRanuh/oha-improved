@@ -2534,6 +2534,9 @@ X.ConsiderItemDesire["item_force_staff"] = function( hItem )
 end
 
 --绿杖
+-- 7.42 Caduceus: its Force active is identical to Force Staff
+X.ConsiderItemDesire["item_caduceus"] = X.ConsiderItemDesire["item_force_staff"]
+
 X.ConsiderItemDesire["item_ghost"] = function( hItem )
 
 	local nCastRange = 800

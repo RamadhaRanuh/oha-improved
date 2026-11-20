@@ -352,7 +352,14 @@ local function GeneralPurchase()
 						ClearCurrBuyingBasicItemList()
 						bot.SecretShop = false
 					else
-						print( botName.." 未能购买物品 "..bot.currBuyingBasicItem.." : "..tostring( bot:ActionImmediate_PurchaseItem( bot.currBuyingBasicItem ) ) )
+						local nRes = bot:ActionImmediate_PurchaseItem( bot.currBuyingBasicItem )
+						if nRes == PURCHASE_ITEM_INVALID_ITEM_NAME or nRes == PURCHASE_ITEM_DISALLOWED_ITEM then
+							-- 7.42: the shop refuses this item (removed or obsolete); skip it so the build does not stall
+							print( botName.." skips unbuyable item "..bot.currBuyingBasicItem.." : "..tostring( nRes ) )
+							ClearCurrBuyingBasicItemList()
+						else
+							print( botName.." 未能购买物品 "..bot.currBuyingBasicItem.." : "..tostring( nRes ) )
+						end
 					end
 				end
 			end
@@ -430,7 +437,14 @@ local function TurboModeGeneralPurchase()
 				-- out of stock, skip that item.
 				ClearCurrBuyingBasicItemList()
 			else
-				print( botName.." 未能购买物品 "..bot.currBuyingBasicItem.." : "..tostring( bot:ActionImmediate_PurchaseItem( bot.currBuyingBasicItem ) ) )
+				local nRes = bot:ActionImmediate_PurchaseItem( bot.currBuyingBasicItem )
+				if nRes == PURCHASE_ITEM_INVALID_ITEM_NAME or nRes == PURCHASE_ITEM_DISALLOWED_ITEM then
+					-- 7.42: the shop refuses this item (removed or obsolete); skip it so the build does not stall
+					print( botName.." skips unbuyable item "..bot.currBuyingBasicItem.." : "..tostring( nRes ) )
+					ClearCurrBuyingBasicItemList()
+				else
+					print( botName.." 未能购买物品 "..bot.currBuyingBasicItem.." : "..tostring( nRes ) )
+				end
 			end
 		end
 	end
