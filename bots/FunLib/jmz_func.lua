@@ -4979,14 +4979,21 @@ function J.GetArmorReducers(hero)
 end
 
 local killTime = 0.0
+local nRoshanKills = 0
 function J.IsRoshanAlive()
 	if GetRoshanKillTime() > killTime
     then
         killTime = GetRoshanKillTime()
+        nRoshanKills = nRoshanKills + 1
     end
 
+    -- 7.42: the respawn timer drops by 1 min per kill, to at least 5 min. Upper bound used here:
+    -- max(5, 11 - kills) min, turbo halved (floor 2.5). Unverified in game.
+    local nRespawnBound = math.max( 5, 11 - nRoshanKills ) * 60
+    if J.IsModeTurbo() then nRespawnBound = math.max( 2.5 * 60, nRespawnBound / 2 ) end
+
     if GetRoshanKillTime() == 0
-	or DotaTime() - killTime > (J.IsModeTurbo() and (6 * 60) or (11 * 60))
+	or DotaTime() - killTime > nRespawnBound
     then
         return true
     end
