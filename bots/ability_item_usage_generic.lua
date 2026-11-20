@@ -28,7 +28,7 @@ local bDeafaultItemHero = BotBuild['bDeafaultItem']
 local sAbilityLevelUpList = BotBuild['sSkillList']
 
 local RadiantFountain = Vector(-6619, -6336, 384)
-local DireFountain = Vector(6928, 6372, 392)
+local DireFountain = Vector(6714, 6162, 392) -- 7.42: Dire fountain moved; same offset from the fountain unit (7152, 6592) as before
 
 local bNeedARDMReload = false
 local nLastKnownPosition = nil  -- tracks bot's position for !pos swap detection
@@ -328,6 +328,12 @@ local function AbilityLevelUpComplement()
 			print("[WARN] Level up ability "..abilityName.." for "..botName.." may fail because it was called on ability that's not available or can't get upgraded anymore.")
 			bot:ActionImmediate_LevelAbility(abilityName)
 			table.remove( sAbilityLevelUpList, 1 )
+		elseif string.find( abilityName, 'special_bonus' ) ~= nil
+			and sAbilityLevelUpList[2] ~= nil
+			and string.find( sAbilityLevelUpList[2], 'special_bonus' ) == nil
+		then
+			-- a talent that is not available yet (e.g. Invoker reaches it at level 9): level the next ability first
+			sAbilityLevelUpList[1], sAbilityLevelUpList[2] = sAbilityLevelUpList[2], sAbilityLevelUpList[1]
 		else
 			print("[WARN] Skipped to level up ability "..abilityName.." for "..botName.." for this time because it may fail.")
 			if botLevel > 25 then
@@ -337,7 +343,8 @@ local function AbilityLevelUpComplement()
 		end
 	end
 
-	if botLevel > 25 and botLevel < 30 and bot:GetAbilityPoints() >= 1 and #sAbilityLevelUpList <= 3 then
+	if botLevel > 25 and botLevel < 30 and bot:GetAbilityPoints() >= 1 and #sAbilityLevelUpList <= 3
+	and botName ~= 'npc_dota_hero_lone_druid_bear' then
 		sAbilityLevelUpList = J.Utils.CombineTablesUnique(J.Skill.GetTalentList( bot ), J.Skill.GetAbilityList( bot ))
 	end
 

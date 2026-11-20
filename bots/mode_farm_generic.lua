@@ -19,7 +19,7 @@ local Siege = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/sie
 local Alone = bGroupFlag and require(GetScriptDirectory()..'/FunLib/behavior/alone') or nil
 local bAloneSafe = false -- farming was moved to our half: Think skips the lane creeps around the bot
 local RB = Vector(-7174.000000, -6671.00000, 0.000000)
-local DB = Vector(7023.000000, 6450.000000, 0.000000)
+local DB = Vector(6809.000000, 6240.000000, 0.000000) -- 7.42: Dire fountain moved; same offset from the fountain unit (7152, 6592) as before
 
 local botName = bot:GetUnitName();
 local sec = 0;

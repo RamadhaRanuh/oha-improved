@@ -23,7 +23,7 @@ export const DebugMode = false;
 export const ScriptID = 3246316298;
 
 export const RadiantFountainTpPoint = Vector(-7172, -6652, 384);
-export const DireFountainTpPoint = Vector(6982, 6422, 392);
+export const DireFountainTpPoint = Vector(6768, 6212, 392); // 7.42: Dire fountain moved
 export const RadiantRoshanLoc = Vector(-2984, 2349, 1092);
 export const DireRoshanLoc = Vector(2980, -2816, 1107);
 export const BarrackList: Barracks[] = [Barracks.TopMelee, Barracks.TopRanged, Barracks.MidMelee, Barracks.MidRanged, Barracks.BotMelee, Barracks.BotRanged];

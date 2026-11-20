@@ -52,7 +52,9 @@ if J.Role.IsPvNMode() or J.Role.IsAllShadow() then X['sBuyList'], X['sSellList']
 
 nAbilityBuildList, nTalentBuildList, X['sBuyList'], X['sSellList'] = J.SetUserHeroInit( nAbilityBuildList, nTalentBuildList, X['sBuyList'], X['sSellList'] )
 
-X['sSkillList'] = J.Skill.GetSkillList( sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList )
+-- The bear's abilities are NOT_LEARNABLE: they level with Lone Druid's own abilities.
+-- A skill list here only made the level-up code retry (and log) every frame.
+X['sSkillList'] = {}
 
 X['bDeafaultAbility'] = false
 X['bDeafaultItem'] = false

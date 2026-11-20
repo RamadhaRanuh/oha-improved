@@ -6,7 +6,7 @@ local tAllyHeroList = {}
 local tAllyHumanList = {}
 
 local RadiantFountain = Vector( -6619, -6336, 384 )
-local DireFountain = Vector( 6928, 6372, 392 )
+local DireFountain = Vector( 6714, 6162, 392 ) -- 7.42: Dire fountain moved; same offset from the fountain unit (7152, 6592) as before
 local RadiantTormentorLoc = Vector(7499, -7847, 256)
 local DireTormentorLoc = Vector(-7229, 7933, 256)
 
