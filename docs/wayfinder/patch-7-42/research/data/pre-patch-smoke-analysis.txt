@@ -1,0 +1,153 @@
+====================================================================================================
+datasets/runs/pre742-gN/g17.log 63010 lines
+-- runtime errors: 20
+   20  (error in error handling)
+-- purchase failures: 0
+-- WARN: 1123
+ 1037  [WARN] Skipped to level up ability beastmaster_inner_beast for npc_dota_hero_beastmaster for this time because it may fail.
+   36  [WARN] No function for the usage of ability: mud_golem_hurl_big_boulder, for unit owned by: npc_dota_hero_beastmaster
+   24  [WARN] No function for the usage of ability: chen_martyrdom, for unit owned by: npc_dota_hero_chen
+    3  [WARN] It seems there is no ability on slot 3 for npc_dota_hero_juggernaut
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_chaos_knight
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_pugna
+    3  [WARN] It seems there is no ability on slot 6 for npc_dota_hero_beastmaster
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_chen
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_luna
+    3  [WARN] It seems there is no ability on slot 6 for npc_dota_hero_luna
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_death_prophet
+    2  [WARN] When loading customized file: ...game/dota/scripts/vscripts/bots/FunLib/custom_loader.lua:5: module 'game/Customize/general' not found:
+-- heroes (last game time 41.3 min)
+  2 chaos_knight     lvl=23 last_item_change= 41.3m  items=armlet,bracer,buckler,crimson_guard,heavens_halberd,hyperstone,power_treads,serrated_shiv
+     casts: chaos_knight_reality_rift=48, item_serrated_shiv=28, chaos_knight_chaos_bolt=25, item_magic_wand=16, item_quelling_blade=14, item_tpscroll=11, chaos_knight_phantasm=10, item_crimson_guard=4, item_magic_stick=3, item_heavens_halberd=1
+  2 dazzle           lvl=17 last_item_change= 41.3m  items=glimmer_cape,magic_wand,null_talisman,pogo_stick,tranquil_boots
+     casts: dazzle_shadow_wave=41, dazzle_poison_touch=39, item_tranquil_boots=24, item_tpscroll=14, item_pogo_stick=12, item_magic_stick=11, item_magic_wand=8, item_ward_observer=7, dazzle_shallow_grave=6, item_shadow_amulet=5, dazzle_nothl_projection_end=3, dazzle_nothl_projection=3, item_glimmer_cape=3
+  2 juggernaut       lvl=20 last_item_change= 38.9m  items=balmhook,magic_wand,manta,mjollnir,power_treads,quelling_blade,wraith_band
+     casts: juggernaut_blade_fury=23, juggernaut_healing_ward=14, item_tpscroll=13, item_quelling_blade=12, item_magic_wand=11, juggernaut_omni_slash=5, item_manta=5, item_seeds_of_serenity=4, item_mjollnir=2
+  2 leshrac          lvl=22 last_item_change= 41.2m  items=arcane_boots,bottle,clarity,cyclone,harmonizer,kaya_and_sange,null_talisman,point_booster,veil_of_discord,vitality_booster
+     casts: leshrac_pulse_nova=89, leshrac_lightning_storm=74, leshrac_split_earth=45, item_bottle=40, item_defiant_shell=35, leshrac_diabolic_edict=32, item_arcane_boots=14, item_tpscroll=11, item_veil_of_discord=8, item_magic_wand=7, item_cyclone=7, item_polliwog_charm=3
+  2 undying          lvl=15 last_item_change= 41.3m  items=arcane_boots,crimson_guard,dust,essence_distiller,idol_of_screeauk,magic_wand,power_treads,ward_sentry
+     casts: undying_decay=59, item_magic_wand=16, item_tpscroll=13, undying_soul_rip=13, item_essence_distiller=9, item_arcane_boots=7, undying_tombstone=6, item_magic_stick=5, item_quelling_blade=3, undying_flesh_golem=3, undying_ceaseless_dirge=3, item_urn_of_shadows=1
+  3 beastmaster      lvl=20 last_item_change= 35.4m  items=bracer,clarity,helm_of_the_dominator,magic_wand,power_treads,quelling_blade,safety_bubble,ultimate_orb
+     casts: beastmaster_wild_axes=77, beastmaster_summon_razorback=29, item_helm_of_the_dominator=23, item_magic_wand=18, item_tpscroll=13, beastmaster_primal_roar=10, item_quelling_blade=9, item_magic_stick=4
+  3 chen             lvl=14 last_item_change= 37.2m  items=dust,famango,glimmer_cape,great_famango,jidi_pollen_bag,magic_wand,ring_of_tarrasque,tranquil_boots
+     casts: item_tranquil_boots=24, chen_penitence=14, item_tpscroll=10, item_ward_observer=5, chen_hand_of_god=5, item_magic_stick=3, item_magic_wand=3, item_shadow_amulet=3, item_glimmer_cape=2
+  3 death_prophet    lvl=21 last_item_change= 41.3m  items=arcane_boots,crellas_crozier,cyclone,fluffy_hat,jidi_pollen_bag,robe,shivas_guard,voodoo_mask
+     casts: death_prophet_carrion_swarm=95, item_bottle=33, item_shivas_guard=16, death_prophet_silence=15, death_prophet_exorcism=12, item_arcane_boots=12, item_tpscroll=7, item_magic_wand=4, item_cyclone=4, item_ghost=1, item_crellas_crozier=1
+  3 luna             lvl=17 last_item_change= 39.9m  items=clarity,magic_wand,manta,mask_of_madness,mithril_hammer,ogre_axe,partisans_brand,power_treads,quelling_blade
+     casts: luna_lucent_beam=73, item_mask_of_madness=22, item_magic_wand=19, item_tpscroll=15, item_quelling_blade=9, luna_eclipse=9, luna_lunar_orbit=6, item_manta=3
+  3 pugna            lvl=15 last_item_change= 38.4m  items=aether_lens,arcane_boots,blood_grenade,dust,essence_distiller,glimmer_cape,jidi_pollen_bag,magic_wand,ward_sentry
+     casts: pugna_nether_blast=69, pugna_nether_ward=17, item_tpscroll=16, pugna_life_drain=16, item_magic_wand=12, item_essence_distiller=10, item_stonefeather_satchel=8, item_arcane_boots=7, pugna_decrepify=6, item_glimmer_cape=3, item_shadow_amulet=2
+====================================================================================================
+datasets/runs/pre742-gN/g21.log 45833 lines
+-- runtime errors: 20
+   20  (error in error handling)
+-- purchase failures: 0
+-- WARN: 22
+    4  [WARN] It seems there is no ability on slot 7 for npc_dota_hero_morphling
+    3  [WARN] It seems there is no ability on slot 2 for npc_dota_hero_morphling
+    3  [WARN] The ability morphling_morph_replicate on slot 6 seems to be an ultimate for hero: npc_dota_hero_morphling. But it is not learnable OR hidden. Check if there is anything wrong with this hero.
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_brewmaster
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_weaver
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_abaddon
+    2  [WARN] When loading customized file: ...game/dota/scripts/vscripts/bots/FunLib/custom_loader.lua:5: module 'game/Customize/general' not found:
+    1  [WARN] The ability morphling_replicate on slot 6 seems to be an ultimate for hero: npc_dota_hero_morphling. But it is not learnable OR hidden. Check if there is anything wrong with this hero.
+-- heroes (last game time 44.4 min)
+  2 brewmaster       lvl=24 last_item_change= 42.8m  items=black_king_bar,boots,ceremonial_robe,magic_wand,pipe,quelling_blade,radiance
+     casts: brewmaster_cinder_brew=53, brewmaster_thunder_clap=38, item_magic_wand=17, item_tpscroll=16, brewmaster_liquid_courage=11, item_quelling_blade=8, brewmaster_primal_split=6, item_polliwog_charm=5, item_pipe=3, item_black_king_bar=1
+  2 lich             lvl=16 last_item_change= 44.0m  items=blood_grenade,clarity,diadem,dust,pipe,stormcrafter,tranquil_boots,urn_of_shadows
+     casts: lich_frost_nova=30, lich_frost_shield=23, item_tranquil_boots=20, item_tpscroll=14, item_urn_of_shadows=14, lich_sinister_gaze=11, item_ward_observer=10, lich_chain_frost=5, item_seeds_of_serenity=4, item_stormcrafter=4, item_pipe=3, item_dust=1
+  2 morphling        lvl=22 last_item_change= 44.3m  items=balmhook,lifesteal,magic_wand,manta,phylactery,power_treads,quelling_blade,ring_of_health,soul_booster
+     casts: morphling_adaptive_strike_agi=31, morphling_waveform=19, item_tpscroll=14, item_magic_wand=13, item_manta=11, item_quelling_blade=10, item_crippling_crossbow=5, morphling_replicate=1, tinker_laser=1, morphling_morph_replicate=1
+  2 nyx_assassin     lvl=20 last_item_change= 41.9m  items=arcane_boots,crippling_crossbow,dagon_2,dust,magic_wand,mekansm,tranquil_boots,ward_sentry
+     casts: item_tranquil_boots=40, nyx_assassin_impale=36, nyx_assassin_jolt=30, nyx_assassin_vendetta=20, item_magic_wand=16, item_tpscroll=14, nyx_assassin_spiked_carapace=8, item_dagon_2=5, item_crippling_crossbow=4, item_dagon=1, item_arcane_boots=1
+  2 zuus             lvl=25 last_item_change= 44.0m  items=black_king_bar,bottle,dandelion_amulet,kaya_and_sange,phylactery,point_booster,travel_boots,ultimate_scepter
+     casts: zuus_arc_lightning=180, zuus_lightning_bolt=70, item_phylactery=69, item_bottle=64, zuus_heavenly_jump=23, item_magic_wand=17, item_tpscroll=12, item_arcane_boots=12, zuus_thundergods_wrath=11, item_mana_draught=2, item_black_king_bar=2, item_dandelion_amulet=2, item_magic_stick=1, zuus_cloud=1
+  3 abaddon          lvl=16 last_item_change= 43.4m  items=ancient_janggo,dust,glimmer_cape,great_famango,magic_wand,polliwog_charm,tranquil_boots
+     casts: abaddon_aphotic_shield=23, item_tranquil_boots=19, abaddon_death_coil=16, item_tpscroll=12, item_magic_stick=11, abaddon_borrowed_time=7, item_ward_observer=6, item_magic_wand=6, item_shadow_amulet=6, item_polliwog_charm=6, item_glimmer_cape=2
+  3 doom_bringer     lvl=17 last_item_change= 43.4m  items=black_king_bar,blink,helm_of_iron_will,phase_boots,point_booster,prophets_pendulum,shivas_guard,vitality_booster
+     casts: item_phase_boots=121, doom_bringer_infernal_blade=53, item_gunpowder_gauntlets=36, doom_bringer_devour=32, doom_bringer_scorched_earth=24, item_stonefeather_satchel=24, item_blink=21, item_magic_wand=17, item_shivas_guard=16, item_tpscroll=10, doom_bringer_doom=9, item_quelling_blade=4, item_black_king_bar=3
+  3 furion           lvl=16 last_item_change= 41.6m  items=ancient_janggo,chipped_vest,diadem,dust,magic_wand,solar_crest,tranquil_boots,urn_of_shadows,ward_sentry
+     casts: furion_sprout=48, furion_teleportation=41, item_tranquil_boots=35, item_tpscroll=16, item_magic_wand=12, item_urn_of_shadows=11, furion_force_of_nature=9, furion_wrath_of_nature=7, item_solar_crest=6, item_pavise=1
+  3 tinker           lvl=19 last_item_change= 39.9m  items=blink,circlet,kaya_and_sange,magic_wand,phylactery,red_ledger,soul_ring
+     casts: tinker_rearm=126, item_bottle=74, tinker_march_of_the_machines=53, tinker_keen_teleport=48, tinker_laser=38, tinker_deploy_turrets=34, item_blink=27, item_soul_ring=21, item_tpscroll=13, item_magic_wand=12, item_phylactery=5
+  3 weaver           lvl=16 last_item_change= 43.1m  items=brick,dragon_lance,falcon_blade,maelstrom,magic_wand,power_treads,wraith_band
+     casts: weaver_geminate_attack=86, weaver_shukuchi=71, weaver_the_swarm=26, item_tpscroll=12, item_magic_wand=6, weaver_time_lapse=4, weaver_time_lapse_ally=4, item_ash_legion_shield=1
+====================================================================================================
+datasets/runs/pre742-gN/g25.log 45356 lines
+-- runtime errors: 20
+   20  (error in error handling)
+-- purchase failures: 1021
+ 1021  npc_dota_hero_meepo 未能购买物品 item_tango : 0
+-- WARN: 4055
+ 3943  [WARN] Skipped to level up ability lone_druid_spirit_bear_return for npc_dota_hero_lone_druid_bear for this time because it may fail.
+   58  [WARN] No function for the usage of ability: mud_golem_hurl_big_boulder, for unit owned by: npc_dota_hero_lycan
+   37  [WARN] No function for the usage of ability: frogmen_water_bubble_small, for unit owned by: npc_dota_hero_lycan
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_sand_king
+    3  [WARN] It seems there is no ability on slot 3 for npc_dota_hero_pudge
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_lone_druid
+    3  [WARN] It seems there is no ability on slot 6 for npc_dota_hero_lone_druid
+    2  [WARN] When loading customized file: ...game/dota/scripts/vscripts/bots/FunLib/custom_loader.lua:5: module 'game/Customize/general' not found:
+    2  [WARN] Skipped to level up ability meepo_poof for npc_dota_hero_meepo for this time because it may fail.
+    1  [WARN] Skipped to level up ability techies_reactive_tazer for npc_dota_hero_techies for this time because it may fail.
+-- heroes (last game time 37.0 min)
+  2 meepo            lvl=19 last_item_change= 36.7m  items=blink,diffusal_blade,magic_wand,power_treads,quelling_blade,serrated_shiv,ultimate_orb,wraith_band
+     casts: meepo_poof=275, item_quelling_blade=31, item_red_ledger=30, item_tpscroll=15, item_magic_wand=14, item_blink=9, item_diffusal_blade=6
+  2 monkey_king      lvl=17 last_item_change= 37.0m  items=desolator,dust,echo_sabre,magic_wand,orb_of_corrosion,power_treads,quelling_blade,seeds_of_serenity,ward_sentry
+     casts: monkey_king_boundless_strike=51, monkey_king_tree_dance=50, item_echo_sabre=36, monkey_king_primal_spring=12, item_tpscroll=10, item_seeds_of_serenity=9, item_quelling_blade=7, item_magic_wand=6, monkey_king_transfiguration=4, monkey_king_wukongs_command=4
+  2 nevermore        lvl=20 last_item_change= 36.5m  items=black_king_bar,dragon_lance,lesser_crit,magic_wand,oblivion_staff,orchid,power_treads,serrated_shiv
+     casts: nevermore_shadowraze3=54, nevermore_shadowraze2=41, item_bottle=34, nevermore_shadowraze1=18, item_magic_wand=12, item_tpscroll=11, item_serrated_shiv=9, nevermore_requiem=4, item_crippling_crossbow=1, item_orchid=1
+  2 sand_king        lvl=15 last_item_change= 36.7m  items=blink,bracer,cyclone,magic_wand,quelling_blade,veil_of_discord,vile_phial
+     casts: item_stonefeather_satchel=36, sandking_burrowstrike=33, sandking_scorpion_strike=29, sandking_sand_storm=20, item_magic_wand=17, item_veil_of_discord=15, item_tpscroll=9, item_quelling_blade=8, item_blink=6, sandking_epicenter=4, item_magic_stick=1, item_crippling_crossbow=1
+  2 techies          lvl=14 last_item_change= 36.9m  items=dust,famango,glimmer_cape,harmonizer,magic_wand,ring_of_tarrasque,shawl,tranquil_boots
+     casts: techies_sticky_bomb=37, techies_land_mines=25, item_magic_wand=19, item_tranquil_boots=17, techies_suicide=14, techies_reactive_tazer_stop=14, techies_reactive_tazer=13, item_tpscroll=9, item_glimmer_cape=8, item_ward_observer=5, item_gunpowder_gauntlets=5, item_shadow_amulet=1
+  3 bounty_hunter    lvl=14 last_item_change= 34.9m  items=ancient_janggo,dust,guardian_greaves,magic_wand,orb_of_frost,pavise,safety_bubble,tranquil_boots,ward_sentry
+     casts: bounty_hunter_jinada=104, bounty_hunter_shuriken_toss=45, bounty_hunter_wind_walk=34, item_tranquil_boots=27, bounty_hunter_track=21, item_magic_wand=16, item_tpscroll=11, item_seeds_of_serenity=5, item_arcane_boots=2, item_guardian_greaves=2
+  3 kunkka           lvl=19 last_item_change= 36.3m  items=blade_mail,bottle,magic_wand,mana_draught,mithril_hammer,phase_boots,quelling_blade,ultimate_scepter
+     casts: kunkka_tidebringer=133, item_phase_boots=99, item_bottle=43, kunkka_torrent=30, kunkka_x_marks_the_spot=25, kunkka_admirals_rum=16, item_tpscroll=13, kunkka_return=12, item_quelling_blade=9, kunkka_ghostship=9, item_magic_wand=8, item_blade_mail=5, item_magic_stick=2, item_mana_draught=2
+  3 lone_druid       lvl=13 last_item_change= 37.0m  items=boots,flask,lifesteal,magic_stick,magic_wand,tango,tpscroll
+     casts: item_tpscroll=48, lone_druid_savage_roar=4, lone_druid_spirit_bear=3, lone_druid_true_form=2, item_magic_wand=1
+  3 lone_druid_bear  lvl=13 last_item_change= 37.0m  items=blades_of_attack,chainmail,gloves,mask_of_madness,mithril_hammer,red_ledger,tango_single
+     casts: item_red_ledger=44, lone_druid_savage_roar_bear=10, lone_druid_spirit_bear_return=7, item_tpscroll=2
+  3 lycan            lvl=19 last_item_change= 21.9m  items=clarity,defiant_shell,helm_of_the_dominator,magic_wand,quelling_blade,ring_of_basilius,ultimate_orb
+     casts: lycan_howl=34, lycan_summon_wolves=31, item_defiant_shell=21, item_helm_of_the_dominator=18, item_tpscroll=15, item_quelling_blade=12, item_magic_wand=12, lycan_shapeshift=8, item_pogo_stick=8
+  3 pudge            lvl=15 last_item_change= 34.6m  items=arcane_boots,crippling_crossbow,dust,magic_wand,pipe
+     casts: pudge_meat_hook=22, pudge_flesh_heap=19, pudge_dismember=11, item_tpscroll=10, item_magic_wand=9, item_arcane_boots=9, item_ward_observer=7, item_crippling_crossbow=3, item_magic_stick=1, item_pipe=1
+====================================================================================================
+datasets/runs/pre742-gN/g29.log 44865 lines
+-- runtime errors: 20
+   20  (error in error handling)
+-- purchase failures: 0
+-- WARN: 346
+  213  [WARN] Skipped to level up ability special_bonus_unique_invoker_3 for npc_dota_hero_invoker for this time because it may fail.
+  104  [WARN] Skipped to level up ability invoker_exort for npc_dota_hero_invoker for this time because it may fail.
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_life_stealer
+    3  [WARN] The ability life_stealer_consume on slot 6 seems to be an ultimate for hero: npc_dota_hero_life_stealer. But it is not learnable OR hidden. Check if there is anything wrong with this hero.
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_muerta
+    3  [WARN] It seems there is no ability on slot 7 for npc_dota_hero_muerta
+    3  [WARN] It seems there is no ability on slot 8 for npc_dota_hero_muerta
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_mirana
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_skeleton_king
+    3  [WARN] The ability invoker_invoke on slot 5 seems to be an ultimate for hero: npc_dota_hero_invoker. But it is not learnable OR hidden. Check if there is anything wrong with this hero.
+    3  [WARN] It seems there is no ability on slot 4 for npc_dota_hero_mars
+    2  [WARN] When loading customized file: ...game/dota/scripts/vscripts/bots/FunLib/custom_loader.lua:5: module 'game/Customize/general' not found:
+-- heroes (last game time 38.5 min)
+  2 broodmother      lvl=19 last_item_change= 37.9m  items=black_king_bar,bloodthorn,buckler,hyperstone,power_treads,soul_ring,stormcrafter,wraith_band
+     casts: broodmother_spawn_spiderlings=47, item_defiant_shell=41, broodmother_insatiable_hunger=19, item_stormcrafter=15, item_bloodthorn=11, item_tpscroll=8, item_soul_ring=7, item_magic_wand=4, item_orchid=4, item_black_king_bar=1
+  2 life_stealer     lvl=15 last_item_change= 38.4m  items=armlet,desolator,gauntlets,orb_of_corrosion,phase_boots,quelling_blade,vile_phial
+     casts: item_phase_boots=49, life_stealer_open_wounds=21, item_tpscroll=13, item_magic_stick=10, life_stealer_rage=8, item_quelling_blade=6
+  2 mirana           lvl=15 last_item_change= 36.1m  items=arcane_boots,dust,glimmer_cape,magic_wand,mekansm,stormcrafter,urn_of_shadows,ward_sentry
+     casts: mirana_starfall=44, mirana_invis=13, mirana_arrow=12, item_tpscroll=11, item_urn_of_shadows=8, item_magic_stick=7, item_arcane_boots=7, item_mekansm=6, item_magic_wand=5, item_polliwog_charm=5, item_shadow_amulet=4, item_stormcrafter=2, item_glimmer_cape=1
+  2 muerta           lvl=21 last_item_change= 37.5m  items=hurricane_pike,lesser_crit,magic_wand,mask_of_madness,power_treads,revenants_brooch
+     casts: muerta_dead_shot=41, item_mask_of_madness=37, item_magic_wand=21, muerta_the_calling=19, item_tpscroll=8, muerta_pierce_the_veil=7, item_seeds_of_serenity=2, item_hurricane_pike=2
+  2 oracle           lvl=14 last_item_change= 38.3m  items=boots_of_bearing,branches,clarity,dust,glimmer_cape,mana_draught
+     casts: oracle_purifying_flames=75, oracle_fortunes_end=28, item_tranquil_boots=18, oracle_fates_edict=16, item_glimmer_cape=11, item_tpscroll=10, item_ward_observer=6, oracle_false_promise=6, item_magic_stick=5, item_mana_draught=5, item_boots_of_bearing=4, item_shadow_amulet=3, item_dust=2
+  3 disruptor        lvl=16 last_item_change= 35.3m  items=dust,fluffy_hat,glimmer_cape,idol_of_screeauk,magic_wand,pavise,staff_of_wizardry,tranquil_boots
+     casts: disruptor_thunder_strike=50, item_tranquil_boots=30, disruptor_electromagnetic_repulsion=26, disruptor_kinetic_field=23, item_magic_wand=17, disruptor_glimpse=12, item_tpscroll=12, item_ward_observer=6, item_glimmer_cape=6, item_pavise=5, disruptor_static_storm=4, item_shadow_amulet=2, item_magic_stick=1
+  3 invoker          lvl=16 last_item_change= 34.6m  items=bracer,ceremonial_robe,hand_of_midas,magic_wand,orchid,power_treads,sphere
+     casts: invoker_invoke=112, invoker_forge_spirit=29, invoker_alacrity=15, item_magic_wand=14, invoker_sun_strike=12, invoker_chaos_meteor=12, item_tpscroll=7, invoker_tornado=6, item_orchid=6, invoker_cold_snap=5, invoker_ghost_walk=5, item_sphere=2, invoker_emp=1, invoker_deafening_blast=1
+  3 mars             lvl=16 last_item_change= 35.1m  items=blink,clarity,cyclone,dandelion_amulet,mithril_hammer,ogre_axe,phase_boots,quelling_blade,soul_ring
+     casts: item_phase_boots=107, mars_gods_rebuke=63, mars_spear=40, item_blink=29, item_magic_wand=19, item_cyclone=11, item_tpscroll=10, item_soul_ring=8, mars_arena_of_blood=6, item_dandelion_amulet=5, item_quelling_blade=4
+  3 rubick           lvl=16 last_item_change= 38.2m  items=aether_lens,arcane_boots,balmhook,clarity,dust,glimmer_cape,magic_wand,ward_sentry
+     casts: rubick_fade_bolt=39, rubick_telekinesis=30, rubick_spell_steal=29, item_arcane_boots=17, item_magic_wand=15, item_tpscroll=11, item_glimmer_cape=11, oracle_purifying_flames=7, oracle_fortunes_end=3, item_magic_stick=2, item_shadow_amulet=2, item_pogo_stick=2, muerta_the_calling=2, life_stealer_open_wounds=2, oracle_fates_edict=1, mirana_arrow=1, mirana_starfall=1, muerta_dead_shot=1
+  3 skeleton_king    lvl=18 last_item_change= 38.2m  items=armlet,blink,gauntlets,magic_wand,phase_boots,quelling_blade,radiance,ring_of_protection,stormcrafter
+     casts: skeleton_king_mortal_strike=113, item_phase_boots=107, skeleton_king_hellfire_blast=34, item_magic_wand=19, skeleton_king_bone_guard=19, item_tpscroll=12, item_stormcrafter=11, item_quelling_blade=8, item_blink=5, skeleton_king_reincarnation=3, item_mana_draught=2
