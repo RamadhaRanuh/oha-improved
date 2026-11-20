@@ -319,6 +319,10 @@ local function AbilityLevelUpComplement()
 			if nextAbility then
 				bot:ActionImmediate_LevelAbility(nextAbility)
 			end
+		elseif abilityToLevelup:GetLevel() >= abilityToLevelup:GetMaxLevel() then
+			-- 7.42: this ability can never be upgraded again (e.g. it became an innate); drop it so the build does not stall
+			print("[WARN] Dropping level up of "..abilityName.." for "..botName..": already at max level "..tostring(abilityToLevelup:GetMaxLevel()))
+			table.remove( sAbilityLevelUpList, 1 )
 		elseif not abilityToLevelup:IsHidden() and botLevel >= abilityToLevelup:GetHeroLevelRequiredToUpgrade() then
 			-- still try it
 			print("[WARN] Level up ability "..abilityName.." for "..botName.." may fail because it was called on ability that's not available or can't get upgraded anymore.")

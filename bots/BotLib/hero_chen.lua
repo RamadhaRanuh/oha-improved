@@ -489,6 +489,8 @@ function X.ConsiderDivineFavor()
 end
 
 function X.ConsiderSummonConvert()
+    -- chen_summon_convert no longer exists (gone before 7.42); a nil here aborted Holy Persuasion and Divine Favor
+    if SummonConvert == nil then return BOT_ACTION_DESIRE_NONE end
     if not SummonConvert:IsFullyCastable()
     or X.IsThereChenCreepAlive()
     then

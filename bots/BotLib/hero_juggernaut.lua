@@ -510,7 +510,10 @@ end
 function X.ConsiderD()
 
 
-	if	not bot:HasScepter()
+	-- 7.42: Swift Slash removed (slot 4 is generic_hidden); the Scepter now upgrades Blade Fury
+	if	abilityD == nil
+		or abilityD:GetName() ~= 'juggernaut_swift_slash'
+		or not bot:HasScepter()
 		or not abilityD:IsFullyCastable() 
 		or bot:HasModifier('modifier_juggernaut_blade_fury')
 		or bot:HasModifier('modifier_juggernaut_omnislash')

@@ -701,6 +701,8 @@ function X.ConsiderDig()
 end
 
 function X.ConsiderMegaMeepo()
+    -- 7.42: Megameepo was removed; MegaMeepo is nil and indexing it aborted SkillsComplement before Earthbind
+    if MegaMeepo == nil then return BOT_ACTION_DESIRE_NONE end
     if not MegaMeepo:IsTrained()
     or not MegaMeepo:IsFullyCastable()
     or bot:HasModifier('modifier_meepo_petrify')
@@ -736,6 +738,7 @@ function X.ConsiderMegaMeepo()
 end
 
 function X.ConsiderMegaMeepoFling()
+    if MegaMeepoFling == nil then return BOT_ACTION_DESIRE_NONE end -- 7.42: removed
     if MegaMeepoFling:IsHidden()
     or not MegaMeepoFling:IsFullyCastable()
     then
