@@ -148,6 +148,7 @@ local HolyPersuasion    = bot:GetAbilityByName('chen_holy_persuasion')
 local DivineFavor       = bot:GetAbilityByName('chen_divine_favor')
 local SummonConvert     = bot:GetAbilityByName('chen_summon_convert')
 local HandOfGod         = bot:GetAbilityByName('chen_hand_of_god')
+local Zealot            = bot:GetAbilityByName('chen_zealot') -- 7.42 innate active: resurrects the anointed Zealot
 
 local PenitenceDesire, PenitenceTarget
 local HolyPersuasionDesire, HolyPersuasionTarget
@@ -182,6 +183,12 @@ function X.SkillsComplement()
     if SummonConvertDesire > 0
     then
         bot:Action_UseAbility(SummonConvert)
+        return
+    end
+
+    if J.CanCastAbility(Zealot) and not J.IsRetreating(bot)
+    then
+        bot:Action_UseAbility(Zealot)
         return
     end
 

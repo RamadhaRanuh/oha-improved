@@ -106,8 +106,7 @@ function X.ConsiderQ()
     -- too far from hero
     if distanceFromHero > 3000
     and J.GetHP(bear) > 0.25
-    and not J.IsRetreating(bear)
-    and not J.Item.HasItem( bear, 'item_ultimate_scepter' ) then
+    and not J.IsRetreating(bear) then -- 7.42: Scepter no longer removes the leash (1300 range), so return with it too
         return BOT_ACTION_DESIRE_HIGH
     end
 

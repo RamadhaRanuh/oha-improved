@@ -162,6 +162,7 @@ modifier_chaos_knight_phantasm_illusion
 local abilityQ = bot:GetAbilityByName( sAbilityList[1] )
 local abilityW = bot:GetAbilityByName( sAbilityList[2] )
 local abilityR = bot:GetAbilityByName( sAbilityList[6] )
+local abilityArmageddon = bot:GetAbilityByName( 'chaos_knight_armageddon' ) -- 7.42 innate active
 local talent6 = bot:GetAbilityByName( sTalentList[6] )
 local abilityArmlet = nil
 
@@ -197,6 +198,13 @@ function X.SkillsComplement()
 		end
 
 		bot:ActionQueue_UseAbility( abilityR )
+		return
+	end
+
+	local castArmageddonDesire, castArmageddonLocation = X.ConsiderArmageddon()
+	if castArmageddonDesire > 0
+	then
+		bot:ActionQueue_UseAbilityOnLocation( abilityArmageddon, castArmageddonLocation )
 		return
 	end
 
@@ -436,6 +444,40 @@ function X.ConsiderW()
 
 	return BOT_ACTION_DESIRE_NONE
 
+end
+
+-- 7.42 Ahead, Armageddon: point charge, only castable while a Phantasm illusion lives.
+-- Charge at the attack target when it is in range 1200 and an illusion is alive.
+function X.ConsiderArmageddon()
+	if not J.CanCastAbility( abilityArmageddon )
+		or bot:IsRooted()
+		or J.IsRetreating( bot )
+	then
+		return BOT_ACTION_DESIRE_NONE, nil
+	end
+
+	local bIllusionAlive = false
+	for _, ally in pairs( GetUnitList( UNIT_LIST_ALLIED_HEROES ) )
+	do
+		if ally ~= nil and ally:IsAlive() and ally:IsIllusion()
+			and ally:GetUnitName() == bot:GetUnitName()
+		then
+			bIllusionAlive = true
+			break
+		end
+	end
+	if not bIllusionAlive then return BOT_ACTION_DESIRE_NONE, nil end
+
+	if J.IsGoingOnSomeone( bot )
+		and J.IsValidHero( botTarget )
+		and J.CanBeAttacked( botTarget )
+		and J.IsInRange( bot, botTarget, 1200 )
+		and not J.IsSuspiciousIllusion( botTarget )
+	then
+		return BOT_ACTION_DESIRE_HIGH, botTarget:GetLocation()
+	end
+
+	return BOT_ACTION_DESIRE_NONE, nil
 end
 
 function X.ConsiderR()

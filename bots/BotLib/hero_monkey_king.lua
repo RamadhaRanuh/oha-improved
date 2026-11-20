@@ -270,6 +270,15 @@ function X.ConsiderBoundlessStrike()
         local nInRangeAlly = J.GetNearbyHeroes(bot,800, false, BOT_MODE_NONE)
         local nInRangeEnemy = J.GetNearbyHeroes(bot,800, true, BOT_MODE_NONE)
 
+        -- 7.42: with Shard, Monkey King jumps to the target point, so aim the strike at the way home
+        if bot:HasModifier('modifier_item_aghanims_shard')
+        and bot:WasRecentlyDamagedByAnyHero(3)
+        and nInRangeEnemy ~= nil and #nInRangeEnemy >= 1
+        and not bot:IsRooted()
+        then
+            return BOT_ACTION_DESIRE_HIGH, J.GetXUnitsTowardsLocation2(bot:GetLocation(), J.GetTeamFountain(), nCastRange)
+        end
+
         if nInRangeAlly ~= nil and nInRangeEnemy
         and J.IsValidHero(nInRangeEnemy[1])
         and J.CanCastOnNonMagicImmune(nInRangeEnemy[1])

@@ -401,7 +401,7 @@ function GetDesireHelper()
 	if GetGameMode() ~= GAMEMODE_MO
 	and J.Site.IsTimeToFarm(bot)
 	and not J.IsDefending(bot)
-	and (bot:GetUnitName() ~= 'npc_dota_hero_lone_druid_bear' or (bot:HasScepter() and not J.IsValid(LoneDruid.hero)))
+	and bot:GetUnitName() ~= 'npc_dota_hero_lone_druid_bear' -- 7.42: Scepter no longer lets the bear leave the druid
 	and (DotaTime() > 8 * 60 or bot:GetLevel() >= 8 or ( bot:GetAttackRange() < 220 and bot:GetLevel() >= 6 ))
 	and networthAdvantage < 6000
 	and not J.IsLateGame()

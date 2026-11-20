@@ -1893,25 +1893,26 @@ ConsiderHeroSpecificRoaming['npc_dota_hero_lone_druid_bear'] = function ()
 	local heroTarget = hero:GetAttackTarget()
 	local hasUltimateScepter = J.Item.HasItem(bot, 'item_ultimate_scepter') or bot:HasModifier('modifier_item_ultimate_scepter_consumed')
     local distanceFromHero = GetUnitToUnitDistance(J.Utils.GetLoneDruid(bot).hero, bot)
+	-- 7.42: Scepter widens the bear's leash to 1300 instead of removing it
+	local nLeash = hasUltimateScepter and 1300 or BearAttackLimitDistance
 
     if J.IsValidHero(hero)
 	and J.GetHP(bot) >= J.GetHP(hero) - 0.2 -- hp is higher or within 20% lower than hero.
 	and J.GetHP(bot) > 0.25
-	and not hasUltimateScepter
 	then
-        if distanceFromHero > BearAttackLimitDistance then
+        if distanceFromHero > nLeash then
 			return BOT_MODE_DESIRE_ABSOLUTE * 1.2
         end
 		local avoidDangerous = (#bot:GetNearbyLaneCreeps(400, true) < 3 and #bot:GetNearbyTowers(800, true) == 0) or bot:GetLevel() >= 3
 		if J.Utils.IsValidUnit(heroTarget)
-		and distanceFromHero <= BearAttackLimitDistance
-		and GetUnitToUnitDistance(hero, heroTarget) < BearAttackLimitDistance + 250
+		and distanceFromHero <= nLeash
+		and GetUnitToUnitDistance(hero, heroTarget) < nLeash + 250
 		and avoidDangerous
 		then
 			return BOT_MODE_DESIRE_ABSOLUTE * 1.2
 		end
 
-		local target = J.GetAttackableWeakestUnitFromList(hero, hero:GetNearbyHeroes(BearAttackLimitDistance + 250, true, BOT_MODE_NONE))
+		local target = J.GetAttackableWeakestUnitFromList(hero, hero:GetNearbyHeroes(nLeash + 250, true, BOT_MODE_NONE))
 		if target ~= nil
 		and avoidDangerous
 		then

@@ -2901,6 +2901,10 @@ function J.ShouldSwitchPTStat( bot, pt )
 		and botAttribute ~= ATTRIBUTE_STRENGTH
 		and botAttribute ~= ATTRIBUTE_AGILITY
 	then
+		-- 7.42: Meepo is Universal but scales with agility
+		if bot:GetUnitName() == 'npc_dota_hero_meepo' then
+			return ptStatus ~= ATTRIBUTE_AGILITY
+		end
 		return ptStatus ~= ATTRIBUTE_STRENGTH
 	end
 
