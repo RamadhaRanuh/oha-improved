@@ -69,6 +69,9 @@ local function PersonaScale(bot, mode, raw, persona, mood)
     if raw == nil then
         return raw
     end
+    if mode == BotMode.TeamRoam and bot.roamSub == "lasthit" and IsOn("lasthit") then
+        return raw
+    end
     local ok, factor = pcall(
         ScaleFactor,
         bot,

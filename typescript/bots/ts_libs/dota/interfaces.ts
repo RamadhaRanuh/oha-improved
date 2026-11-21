@@ -22,6 +22,16 @@ export interface Ping {
     player_id: number;
 }
 
+/** One entry of Unit.GetIncomingTrackingProjectiles(). */
+export interface TrackingProjectile {
+    location: Vector;
+    caster: Unit | null;
+    player: number;
+    ability: Ability | null;
+    is_dodgeable: boolean;
+    is_attack: boolean;
+}
+
 export interface Item {
     GetName(): string;
     GetCurrentCharges(): number;
@@ -119,12 +129,20 @@ export interface Unit {
     Action_ClearActions(stop: boolean): void;
     Action_MoveToLocation(location: Vector): void;
     Action_AttackUnit(unit: Unit, once: boolean): void;
+    Action_Delay(delay: number): void;
+    ActionQueue_AttackUnit(unit: Unit, once: boolean): void;
     Action_PickUpRune(rune: Rune): void;
     Action_MoveToUnit(unit: Unit): void;
     Action_UseAbilityOnTree(ability: Ability | Item, tree: number): void;
     GetNearbyTrees(radius: number): number[];
     GetAttackPoint(): number;
     GetSecondsPerAttack(): number;
+    GetAnimCycle(): number;
+    GetAttackProjectileSpeed(): number;
+    GetBaseDamage(): number;
+    GetBaseDamageVariance(): number;
+    GetIncomingTrackingProjectiles(): TrackingProjectile[];
+    IsTower(): boolean;
     GetEstimatedDamageToTarget(currentlyAvailable: boolean, target: Unit, duration: number, damageType: number): number;
     IsFacingLocation(location: Vector, degrees: number): boolean;
     IsUsingAbility(): boolean;

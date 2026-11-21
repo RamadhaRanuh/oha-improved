@@ -16,6 +16,8 @@ local Flags = require(GetScriptDirectory()..'/FunLib/behavior/flags')
 local sHumanMode = nil -- 'group' | 'explore' while one of them owns this mode
 -- Behaviour flag `group`: walk to a defence or push meeting point, or back to the regrouping team (behavior/group).
 local Group = Flags.IsOn('group') and require(GetScriptDirectory()..'/FunLib/behavior/group') or nil
+-- Flag `lasthit`: laning last hits and denies (behavior/lasthit) replace X.GetLastHitCreep before 12:00.
+local LastHit = Flags.IsOn('lasthit') and require(GetScriptDirectory()..'/FunLib/behavior/lasthit') or nil
 -- Exploration in data games (behavior/decision_log): a forced fight runs through team roam.
 local DecisionLog = require(GetScriptDirectory()..'/FunLib/behavior/decision_log')
 if not DecisionLog.Active() then DecisionLog = nil end
@@ -96,7 +98,8 @@ function GetDesire()
     -- if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
 
     local res = GetDesireHelper()
-    res = CapForLanePush(res)
+    -- A laning last-hit bid (flag lasthit) is timed to the creep's window; the lane cap would let laning win.
+    if not (bot.roamSub == 'lasthit' and LastHit ~= nil) then res = CapForLanePush(res) end
 
     if DecisionLog ~= nil and DecisionLog.Forced(bot) == 'fight' then
         sHumanMode = 'explore'
@@ -176,10 +179,20 @@ function GetDesireHelper()
 		end
 	end
 
-	hTargetCreep = X.GetLastHitCreep()
-	if J.IsValid(hTargetCreep) and J.CanBeAttacked(hTargetCreep) then
-		bot.roamSub = 'lasthit'
-		return 1.5
+	if LastHit ~= nil and DotaTime() < 12 * 60 then
+		hTargetCreep = nil
+		local nLastHit = SafeCall('lasthit', LastHit.Desire, bot) or 0
+		if nLastHit > 0 then
+			sHumanMode = 'lasthit'
+			bot.roamSub = 'lasthit'
+			return nLastHit
+		end
+	else
+		hTargetCreep = X.GetLastHitCreep()
+		if J.IsValid(hTargetCreep) and J.CanBeAttacked(hTargetCreep) then
+			bot.roamSub = 'lasthit'
+			return 1.5
+		end
 	end
 
     if not bot:IsAlive() or bot:GetCurrentActionType() == BOT_ACTION_TYPE_DELAY then
@@ -354,6 +367,10 @@ function Think()
     if J.CanNotUseAction(bot) then return end
 	if sHumanMode == 'group' then
 		SafeCall('group', Group.Think, bot)
+		return
+	end
+	if sHumanMode == 'lasthit' then
+		SafeCall('lasthit', LastHit.Think, bot)
 		return
 	end
 	-- diabled think less to avoid failing to last hit

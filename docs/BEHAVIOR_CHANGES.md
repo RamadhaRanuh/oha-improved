@@ -44,6 +44,7 @@ A missing table or key counts as off.
 | `persona` | Hidden per-game personas for the team's bots (greedy, playmaker, bully, guardian, hothead), drawn by position, at most two per persona. Each scales retreat, farm, team roam, push, defend, rune, ward and Roshan desires; never shown to players (fun vs humans, 2026-11-20) | `behavior/persona`, `behavior/arbiter` (Wrap) |
 | `mood` | Moods on top of the persona: a bot tilts after 3 deaths in 4 min or 2 deaths to the same enemy (grudge), calms after 4 min or a feed guard; the team turns cocky (spreads out, delays the end, never after 40:00) or desperate (groups, plays safe) on a scoreboard lead (kills, levels, towers; bots cannot read enemy net worth) | `behavior/mood`, `behavior/arbiter` (Wrap) |
 | `smartchat` | Offline all-chat: taunts, revenge, throwbacks of a human's own trash talk, tilt lines, flaming its own team, fight and team-mood lines, and replies to every human all-chat message by intent, persona, mood and the human's heat. Replaces X.SetTalkMessage for the team. Trash_Talk_Level 3 adds the harsh lines; user lines in `Customize/trash_talk.lua`. Tests: `npm test` | `behavior/talk`, `behavior/talk_text`, `behavior/talk_lines`, `ability_item_usage_generic.lua` |
+| `lasthit` | Laning last hits and denies before 12:00: a per-creep damage timeline, hits timed to land when the creep is killable (queued with a delay when the window opens between script runs), denies below 50% health, holding in range for a creep about to be killable. Replaces team roam's old last-hit grab. Kept 2026-11-21: 5v5 last hits +2.4 per hero at 10:00, denies +5.8 (16 fixed lineups vs the release flags); in the release set | `behavior/lasthit`, `mode_team_roam_generic.lua`, `behavior/arbiter` |
 
 **Tested and removed (2026-11-16, 32-game eval batches against `group`):** `bail` (group roles dropped below 55% health; 13/32 vs 18/32), `yield` (retreat outbids attack and group modes below 45% health; 14/32 vs 15/32), `siegecut` (a hero lead alone no longer opens high ground; 15/32 vs 17/32). How changes are tested and judged: [TESTING.md](TESTING.md).
 
@@ -174,6 +175,31 @@ Goal: playability and enjoyment against human players, not win rate against plai
 - **Moods** (`behavior/mood`): team-level scan every 0.5 s of kills and deaths (the killer is the enemy whose kill count rose in the same scan). Tilted: riskier (retreat 0.85, gank 1.15). Cocky team: retreat 0.9, farm 1.15, push 0.85, defend 0.9. Desperate team: retreat 1.1, defend 1.15. Hothead moods hit 1.5x; a guardian needs a fourth death to tilt. Lead = kills x200 + summed levels x250 + towers x600 (enemy `GetNetWorth()` reads -1 to -5 for bots, checked in the smoke game). Debug lines `MOOD`, `TEAMMOOD`, `LEAD` (every 60 s, with our net worth for calibration).
 - **Chat** (`behavior/talk`): built from studies of real Dota all chat (Lim et al. 2024; Halonen 2024): taunts right after small wins, "?" after mistakes, provocations while losing, minimising ("lucky"), quoting scores, challenges, throwing a player's words back, flaming one's own team, short lowercase messages. Every line has to be funny; no slurs and nothing about self-harm (the test fails on a banned-word list). Persona sets who talks and how much (hothead most, guardian least) and adds its own lines; tilt adds caps and harsh lines; a human's heat (+1 per trash message, +2 for ez, -1 for wp / lol / hi, decays 1 per 2 min) escalates replies. Rate limits: one message per bot per 3 s, ten per team per minute, one reply per human per 4 s. In debug mode the all chat of enemy bots counts as human, so bot-vs-bot smoke games exercise the replies. Debug line `TALK team= hero= t= kind= to= text=`.
 - **Names** (`Customize.Human_Like_Names`, not a flag): 'Random' bot names become pub-style names from `FunLib/pub_names.lua`, each team from its own half of the list.
+
+### Laning last hits and denies (`lasthit`, 2026-11-21)
+
+Goal: bots that last-hit and deny like a sharp human in lane. Measured with `CSREC`, the solo/duel drill and `npm run cs` ([TESTING.md](TESTING.md), "Last hits and denies").
+
+- **Before:** with the release flags, carries took 27% of their lane's creeps by 10:00 (21 last hits; 69 alone in a drill). The old team-roam grab fired only on a creep already killable within the attack delay, counted only lane creeps' swings and never denied; Valve's laning Think did the rest.
+- **How** (`behavior/lasthit`, called by team roam's Desire and Think):
+  - **Prediction:** a damage timeline per creep (projectiles in flight, and the swings of every visible lane creep, tower and hero attacking it), our hit time (walk, attack cooldown, wind-up, projectile) and our damage (attack damage minus half the variance, plus Quelling Blade, after armor).
+  - **Actions:** hit when the predicted health at our landing is in (0, our damage]; a queued hit (`Action_Delay` then `ActionQueue_AttackUnit`) when that window opens before the next script run; deny an own creep below 50%; hold in range when a creep becomes killable within 1.5 s; cancel an issued hit only when the creep would survive it.
+  - **Rules:** supports leave enemy creeps to a core within 900 (they still deny); next to an enemy tower only while it shoots a creep and above 50% health; no hold while retreating or outnumbered; nothing in a team fight, while casting, or below 30% health with an enemy within 800.
+- **Three findings that made it work:**
+  1. The bot script runs only about 3 times a game second (also at timescale 1), so a hit has to be queued for its exact moment.
+  2. Team roam caps every bid at 0.72 in the laning phase (`CapForLanePush`) and `persona` scaled it again, so laning or harass often won over a timed hit. A last-hit bid now skips both (0.9 for a hit; it wins 92% of calls).
+  3. Cancelling a hit that would land after the creep dies threw creeps away (9-13% of those lost near cores): the engine drops that attack for free, and a wrong prediction still gets the creep.
+- **Results** (screens to 11:00, release flags with vs without `lasthit`, paired by game and hero):
+
+| Batch | Last hits at 10:00 | Denies at 10:00 |
+|---|---|---|
+| 5v5 games 1-8 (`cs-match-lh6` vs `cs-match-rel-miss`) | +1.8 ± 1.2 | +6.3 |
+| 5v5 games 9-16 (`cs-match-lh6b` vs `cs-match-rel-b`) | +3.0 ± 0.9 | +5.3 |
+| Solo mid drill (`cs-solo2-lh6` vs `cs-solo2-rel`) | +4.5 ± 1.8 | +11.5 |
+
+  Share of nearby own creeps denied: 28% vs 16-17% in 5v5, 50% vs 33% solo. Earlier rounds without the three findings: last hits within ±1, denies +3 to +9.
+- **Debug lines:** `LASTHIT`, `LHBID`, `LHWHY` (why each nearby enemy creep that died was not ours), `LHPRED`, `LHCANCEL`, `LHHOLDMISS`; formats in the module header.
+- **Not done:** reading a human's attack animation to race them for a creep; harass between last hits; spells for last hits.
 
 ### Human feel (`humanfeel`, removed 2026-11-17)
 

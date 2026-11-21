@@ -86,6 +86,8 @@ function ScaleFactor(bot: Unit, mode: BotMode, persona: boolean, mood: boolean):
  */
 function PersonaScale(bot: Unit, mode: BotMode, raw: number | undefined, persona: boolean, mood: boolean): number | undefined {
     if (raw === undefined) return raw;
+    // A laning last-hit bid (flag `lasthit`) is timing, not a gank: personas and moods leave it alone.
+    if (mode === BotMode.TeamRoam && (bot as unknown as { roamSub?: string }).roamSub === "lasthit" && IsOn("lasthit")) return raw;
     const [ok, factor] = pcall(ScaleFactor, bot, mode, persona, mood);
     if (ok) return Persona.ApplyFactor(raw, factor as number);
     if (!personaErrors[`${factor}`]) {

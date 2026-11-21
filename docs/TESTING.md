@@ -81,6 +81,7 @@ Mode numbers: 1 lane, 2 attack, 3 roam, 4 retreat, 7 rune, 8-10 push, 11-13 defe
 
 - `GetActiveModeDesire()` reads 0 while attack mode holds the bot (attack's desire lives in C++), and roam bids 1.0. To make retreat win, bid `BOT_MODE_DESIRE_ABSOLUTE` and hold it for a few seconds, not "active + a little".
 - `GetRespawnTime()` needs the dead hero's own unit: bots cannot see enemy respawn times.
+- A bot's mode scripts run only every 0.15-0.4 s (`GetDesire` about 3 times a game second, at timescale 1 and 8 alike), not every frame: anything that must happen at an exact moment (a last hit) has to be queued (`Action_Delay` + `ActionQueue_*`). And team roam caps its bids at 0.72 in the laning phase (`CapForLanePush`), with `persona` / `mood` scaling on top: count whether a bid actually wins (`LHBID` in `behavior/lasthit`) before trusting it.
 - TypeScript-to-Lua: `(x as any).Method()` compiles to `x.Method()` without `self` (use typed calls; add missing methods to `ts_libs/dota/interfaces.ts`), and `array.length` used as a condition is always true in Lua (compare with `> 0`).
 - `git status` right after a build lists only real changes: the build re-adds files whose only change is line endings (tstl writes LF, `core.autocrlf` checks out CRLF), which stages nothing.
 

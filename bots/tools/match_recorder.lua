@@ -256,6 +256,28 @@ local function laneOf(loc)
 	return 'bot'
 end
 
+-- CSMISS line for an enemy lane creep that died near a hero to a creep, tower or nobody: what the hero was doing.
+local function printMiss(unit, killer, hero, loc)
+	local target = hero:GetAttackTarget()
+	local atk = 'none'
+	if target ~= nil and not target:IsNull() then
+		if target == unit then atk = 'this'
+		elseif target:IsHero() then atk = 'hero'
+		elseif target.IsTower and target:IsTower() then atk = 'tower'
+		elseif target:GetTeamNumber() == hero:GetTeamNumber() then atk = 'deny'
+		else atk = 'creep' end
+	end
+	local by = 'none'
+	if killer ~= nil and not killer:IsNull() then
+		if killer.IsTower and killer:IsTower() then by = 'tower' else by = 'creep' end
+	end
+	local name = unit:GetUnitName()
+	local kind = string.find(name, 'siege') and 'siege' or string.find(name, 'ranged') and 'ranged' or 'melee'
+	rawPrint(string.format('CSMISS t=%.1f hero=%s team=%d d=%d hp=%.2f atk=%s kind=%s by=%s',
+		gameTime(), string.gsub(hero:GetUnitName(), 'npc_dota_hero_', ''), hero:GetTeamNumber(),
+		math.floor((hero:GetAbsOrigin() - loc):Length2D()), hero:GetHealth() / math.max(1, hero:GetMaxHealth()), atk, kind, by))
+end
+
 -- One lane creep died before CS_UNTIL: count it for its lane, and for every living real hero within CS_NEAR.
 local function countCreepDeath(unit, killer)
 	local creepTeam = unit:GetTeamNumber()
@@ -279,7 +301,10 @@ local function countCreepDeath(unit, killer)
 				if pid == heroPid then row.lhLane = row.lhLane + 1
 				elseif pidTeam == heroTeam then row.lhAlly = row.lhAlly + 1
 				elseif pidTeam == creepTeam then row.lhDenied = row.lhDenied + 1
-				else row.lhMissed = row.lhMissed + 1 end
+				else
+					row.lhMissed = row.lhMissed + 1
+					printMiss(unit, killer, hero, loc)
+				end
 			else
 				row.dnNear = row.dnNear + 1
 				if pid == heroPid then row.dnLane = row.dnLane + 1

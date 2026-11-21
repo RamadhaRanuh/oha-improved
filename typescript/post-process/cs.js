@@ -61,7 +61,7 @@ function load(name) {
     const manifest = fs.existsSync(mf) ? JSON.parse(fs.readFileSync(mf, "utf8")) : { games: {} };
     const games = {};
     for (const f of fs.readdirSync(dir)) {
-        const m = f.match(/^console\.g(\d+)\.log$/);
+        const m = f.match(/^console\.g(\d+)(?:\.smoke)?\.log$/);
         if (!m) continue;
         const g = Number(m[1]);
         const rec = { newTeam: (manifest.games[g] || {}).newTeam, drill: manifest.drill || null, slots: slotsOf(dir, g) };
