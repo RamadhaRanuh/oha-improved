@@ -69,7 +69,8 @@ With debug prints on (every batch turns them on), the console log has these line
 | `SIEGE`, `SIEGEGO` | flag `group` | high-ground gate and siege windows (`start … why=lead|aegis|few`, `end … dur=`) |
 | `ALONE` | flag `group` | `blocked=farm|ward|defend missing=N`, at most once per 20 s per hero |
 | `FIGHTDEC`, `FIGHTOUT`, `FIGHTOUT30` | every bot | fight decision log for the learned policy |
-| `MATCHREC {json}` | game end | winner, duration, kills, nw10, lh10, lineup |
+| `MATCHREC {json}` | game end | winner, duration, kills, nw10, lh10, dn10, cs10, lineup |
+| `CSREC {json}` | 5:00 and 10:00 | `t near heroes`: per hero lh, dn and the lane-creep account (section "Last hits and denies") |
 | `DRAFTFLAG` | hero selection start, per team | `team seed=<n|none>` (`rng=missing` if the seeded stream could not load) |
 | `DRAFTSETUP` | hero selection start, per team, seeded only | `team seed heroes pools preselect`: checksums of the role pools and preselects, equal in every game of one seed |
 | `DRAFTPICK` | each bot pick, both teams | `team pos hero t seq` (the team's pick number) `enemy` (enemy picks before it) `seed why=schedule`; the hero the bot asked for, so a hero the engine refuses still appears |
@@ -82,6 +83,22 @@ Mode numbers: 1 lane, 2 attack, 3 roam, 4 retreat, 7 rune, 8-10 push, 11-13 defe
 - `GetRespawnTime()` needs the dead hero's own unit: bots cannot see enemy respawn times.
 - TypeScript-to-Lua: `(x as any).Method()` compiles to `x.Method()` without `self` (use typed calls; add missing methods to `ts_libs/dota/interfaces.ts`), and `array.length` used as a condition is always true in Lua (compare with `> 0`).
 - `git status` right after a build lists only real changes: the build re-adds files whose only change is line endings (tstl writes LF, `core.autocrlf` checks out CRLF), which stages nothing.
+
+### Last hits and denies (`CSREC`, `--drill`, `npm run cs`)
+
+The match recorder prints `CSREC {json}` at 5:00 and 10:00 in every game (also in screens, which stop before `MATCHREC`). Per hero it has the scoreboard's `lh` and `dn` and a lane-creep account: every lane creep that dies counts for each living hero within 1000 of it.
+- **Enemy creep (`lhNear`):** the hero took it (`lhLane`), a teammate did (`lhAlly`), the enemy denied it (`lhDenied`), or a creep or tower got it (`lhMissed`).
+- **Own creep (`dnNear`):** the hero denied it (`dnLane`), or an enemy last-hit it (`dnLost`).
+
+`MATCHREC` also has `dn10` and `cs10`.
+
+**Drill:** `npm run batch -- start 1-8 <flags> --drill=solo --screen=10 --parallel=5 --name=cs-...`. `bots/tools/cs_drill.lua` (server side, loaded by `game.sh` in every game, a no-op without `Customize.Drill`) stuns every hero in its fountain except the one at slot `pos` (default 2, mid). 
+- **`solo`:** only the new team's hero plays, alone in its lane, so LH% measures pure last hitting and DN% pure denying.
+- **`duel`:** both teams' heroes at that slot play (pos 2 only: mid against mid).
+- **Run time:** games 1-8 at 5 at once take about 15 minutes. They play puck, templar_assassin, lina and death_prophet, each once per side.
+- **Debug lines:** `CSDRILL loaded`, `CSDRILL mode= team= pos= active=`, `CSDRILL frozen=<hero>`.
+
+**Report:** `npm run cs -- <batch> [<baseline>]` prints LH and DN at 5:00 and 10:00, LH% (`lhLane / lhNear`), DN% and the misses per hero. With a baseline it pairs by game and hero and prints the differences. `compare` and `cs` refuse to mix drill and match batches.
 
 ### Tuning thresholds (`--tune`)
 

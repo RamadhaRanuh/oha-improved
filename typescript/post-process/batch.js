@@ -9,6 +9,10 @@
 //                                          (match-setup --draft): game g plays Draft_Seed ceil(g/2), the new team
 //                                          Radiant on odd and Dire on even games (any checkout: Draft_Seed is on main).
 //                                          Compare only with another --draft batch over the same games.
+//   npm run batch -- start <games> <flags> --drill=solo|duel[:<pos>] --screen=10   last-hit drill (match-setup
+//                                          --drill): only the hero at slot <pos> plays, everyone else waits stunned in
+//                                          the fountain; score it with npm run cs -- <name>. Compare drills only with
+//                                          drills of the same mode and position.
 //   npm run batch -- early <name> <baseline>[+<baseline>...] [--stop]   early stop for a running batch: stops
 //                                          (with --stop) once its paired gold lead is clearly worse than the
 //                                          baseline's, by an O'Brien-Fleming boundary fixed before the batch
@@ -90,6 +94,8 @@ const screenMinute = m => (m.screen ? Math.floor(m.screen / 60) - 1 : Infinity);
 function sameDraft(names) {
     if (new Set(names.map(n => !!manifestOf(n).draft)).size > 1)
         fail(`Do not compare free-draft and fixed-lineup batches: game numbers mean different matches (${names.map(n => `${n} ${manifestOf(n).draft ? "draft" : "lineups"}`).join(", ")}).`);
+    if (new Set(names.map(n => manifestOf(n).drill || "")).size > 1)
+        fail(`Do not compare drill and match batches, or drills of another kind (${names.map(n => `${n} ${manifestOf(n).drill || "match"}`).join(", ")}).`);
 }
 // A change is judged against a baseline of its own flags minus the one under test. On 2026-11-17 a day of screens
 // on group,fixes,corefarm,roshsafe was judged against a group,fixes,corefarm pool, and identical code has drifted
@@ -287,14 +293,21 @@ function start() {
     const tune = typeof opts.tune === "string" && opts.tune ? opts.tune : "";
     if (opts.tune !== undefined && !tune) fail("--tune needs name=value[,name=value...]");
     if (tune) manifest.tune = tune;
+    // --drill=solo|duel[:pos]: last-hit drill (match-setup validates it).
+    const drill = typeof opts.drill === "string" && opts.drill ? opts.drill : "";
+    if (opts.drill !== undefined && !drill) fail("--drill needs solo or duel, e.g. --drill=solo:2");
+    if (drill && draft) fail("--drill needs fixed lineups; drop --draft");
+    if (drill) manifest.drill = drill.includes(":") ? drill : `${drill}:2`;
     for (const g of games) {
         const args = [path.join(__dirname, "match-setup.js"), String(g), flags, `--explore=${explore}`, `--out=${path.join(dir, "cfg", `g${g}`)}`];
         if (draft) args.push("--draft");
         if (tune) args.push(`--tune=${tune}`);
+        if (drill) args.push(`--drill=${drill}`);
         const r = spawnSync(process.execPath, args, { encoding: "utf8" });
         if (r.status !== 0) fail(`match-setup failed for game ${g}:\n${r.stderr || r.stdout}`);
         if (draft && !/free draft, Draft_Seed \d+/.test(r.stdout)) fail(`match-setup did not set up a free draft for game ${g} (is this the draft code?):\n${r.stdout}`);
         if (tune && (r.stdout.match(/ tune=(\S+)$/m) || [])[1] !== tune) fail(`match-setup did not apply --tune=${tune} for game ${g} (is this the tune code?):\n${r.stdout}`);
+        if (drill && (r.stdout.match(/ drill=(\S+)$/m) || [])[1] !== manifest.drill) fail(`match-setup did not apply --drill=${drill} for game ${g} (is this the drill code?):\n${r.stdout}`);
         const radiantNew = /Radiant:.*<- NEW/.test(r.stdout);
         // In a free draft the "pair" is the seed: games 2k-1 and 2k.
         const pair = (r.stdout.match(draft ? /Draft_Seed (\d+)/ : /pair (\d+)/) || [])[1];
@@ -304,7 +317,7 @@ function start() {
     fs.writeFileSync(path.join(dir, "games.txt"), games.join("\n") + "\n");
 
     launch(dir, name, "games.txt", parallel, timescale, screen);
-    console.log(`Batch ${name} (${manifest.kind}${draft ? ", free draft" : ""}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}${tune ? `, tune ${tune}` : ""}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
+    console.log(`Batch ${name} (${manifest.kind}${draft ? ", free draft" : ""}${drill ? `, drill ${manifest.drill}` : ""}${screen ? `, screen: stops at ${screen / 60}:00` : ""}): games ${games.join(",")}, flags ${flags}${tune ? `, tune ${tune}` : ""}, ${parallel} at once, timescale ${timescale}, explore ${explore}`);
     console.log(`  Logs: ${path.relative(root, dir)}   Progress: npm run batch -- status   Results: npm run batch -- report`);
 }
 

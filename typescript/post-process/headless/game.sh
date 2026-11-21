@@ -1,8 +1,8 @@
 #!/bin/bash
 # One headless Dota game on the Linux build in WSL (docs/specs/learned-fight-decisions.md, step 0).
 # Usage: game.sh <run dir> <timescale> <port> [stop at game seconds]
-# Plays the bot scripts mounted at <dota>/game/dota/scripts/vscripts/bots, loads the match recorder when
-# the pick phase starts, and stops the server once the MATCHREC line is written (or after 40 real minutes).
+# Plays the bot scripts mounted at <dota>/game/dota/scripts/vscripts/bots, loads the match recorder (and the
+# last-hit drill, a no-op without Customize.Drill) when the pick phase starts, and stops the server once the MATCHREC line is written (or after 40 real minutes).
 # With a stop time (screen batches) it also stops once the trace's game time (POS lines) passes it.
 # Writes console.log and stdout.log into <run dir>.
 R=$1; TS=${2:-8}; PORT=${3:-27015}; STOP=${4:-0}
@@ -20,6 +20,7 @@ PID=$!
 exec 3>"$R/stdin"
 for i in $(seq 1 180); do grep -aq "HERO_SELECTION" "$R/console.log" 2>/dev/null && break; sleep 1; done
 echo "sv_cheats 1" >&3; echo "script_reload_code bots/tools/match_recorder" >&3
+echo "script_reload_code bots/tools/cs_drill" >&3   # last-hit drill; does nothing without Customize.Drill
 for i in $(seq 1 2400); do
   grep -aq "MATCHREC {" "$R/console.log" 2>/dev/null && break
   kill -0 $PID 2>/dev/null || break

@@ -20,9 +20,21 @@ At post-game it prints one line, prefixed "MATCHREC ", with a JSON record:
            (counted from tower deaths seen after the recorder loaded)
   nw10 / nw20 / nwEnd   summed net worth per team
   lh10     last hits per hero at 10:00
-  seed     the per-bot personality seeds are the MATCHSEED lines in console.log; join on time
+  dn10     denies per hero at 10:00
+  cs10     last-hit accounting per hero at 10:00 (the CSREC fields below)
+  seed    the per-bot personality seeds are the MATCHSEED lines in console.log; join on time
   timescale  host_timescale when the game ended (null if it could not be read)
 A snapshot taken before the recorder was loaded is null.
+
+At 5:00 and 10:00 it also prints "CSREC {json}" (screen games stop before MATCHREC, so this line is
+printed on its own): t, near, and per hero {team, lh, dn, lhNear, lhLane, lhAlly, lhDenied, lhMissed,
+dnNear, dnLane, dnLost}, and lanes: lane creeps that died by the creep's team and lane (top / mid / bot:
+mid within 2500 of the diagonal). Every lane creep that dies counts for each living real hero within CS_NEAR of it:
+  enemy creep -> lhNear; the hero took it (lhLane), a teammate did (lhAlly), the creep's own side denied
+                 it (lhDenied), or a creep / tower / nobody got it (lhMissed)
+  own creep   -> dnNear; the hero denied it (dnLane), or an enemy player last-hit it (dnLost)
+Kills by a hero's summons or illusions count for the hero, as the scoreboard does. lh and dn are the
+scoreboard's GetLastHits / GetDenies, so they also hold kills outside the lane (neutrals).
 
 Launch Dota with -console -condebug so the line lands in game/dota/console.log.
 --]]
@@ -44,6 +56,13 @@ local R = MatchRecorder
 R.towers = R.towers or { [RADIANT] = 0, [DIRE] = 0 }
 R.snap = R.snap or {}
 R.printed = R.printed or false
+-- Last-hit accounting per hero name (see the header), and which CSREC minutes are printed.
+R.cs = R.cs or {}
+R.csPrinted = R.csPrinted or {}
+-- Lane creeps that died before CS_UNTIL, by the creep's team and lane.
+R.laneDeaths = R.laneDeaths or { radiant = { top = 0, mid = 0, bot = 0 }, dire = { top = 0, mid = 0, bot = 0 } }
+local CS_NEAR = 1000
+local CS_UNTIL = 10 * 60
 
 ---------------------------------------------------------------------------
 -- JSON (small, enough for this record)
@@ -194,6 +213,103 @@ local function lastHitsByHero()
 	return res
 end
 
+local function deniesByHero()
+	local res = {}
+	for _, team in ipairs({ RADIANT, DIRE }) do
+		for _, id in ipairs(playerIdsOf(team)) do
+			local name = PlayerResource:GetSelectedHeroName(id)
+			if name ~= nil and name ~= '' then
+				res[name] = PlayerResource:GetDenies(id)
+			end
+		end
+	end
+	return res
+end
+
+-- Last-hit accounting row of a hero, created on first use.
+local function csRow(name, team)
+	local row = R.cs[name]
+	if row == nil then
+		row = { team = teamKey(team), lhNear = 0, lhAlly = 0, lhDenied = 0, lhMissed = 0, dnNear = 0, dnLost = 0, lhLane = 0, dnLane = 0 }
+		R.cs[name] = row
+	end
+	return row
+end
+
+local function isLaneCreep(unit)
+	local c = unit:GetClassname()
+	return c == 'npc_dota_creep_lane' or c == 'npc_dota_creep_siege'
+end
+
+-- The player behind a killer (a hero, or its summon or illusion), or -1 for creeps, towers and nobody.
+local function killerPlayer(killer)
+	if killer == nil or killer:IsNull() then return -1 end
+	local ok, id = pcall(function() return killer:GetPlayerOwnerID() end)
+	if ok and type(id) == 'number' and id >= 0 and PlayerResource:IsValidPlayerID(id) then return id end
+	return -1
+end
+
+-- Lane of a point: mid within 2500 of the diagonal, top above it, bot below it.
+local function laneOf(loc)
+	if math.abs(loc.x - loc.y) < 2500 then return 'mid' end
+	if loc.y > loc.x then return 'top' end
+	return 'bot'
+end
+
+-- One lane creep died before CS_UNTIL: count it for its lane, and for every living real hero within CS_NEAR.
+local function countCreepDeath(unit, killer)
+	local creepTeam = unit:GetTeamNumber()
+	local lanes = R.laneDeaths[teamKey(creepTeam)]
+	if lanes ~= nil then
+		local lane = laneOf(unit:GetAbsOrigin())
+		lanes[lane] = lanes[lane] + 1
+	end
+	local pid = killerPlayer(killer)
+	local pidTeam = pid >= 0 and PlayerResource:GetTeam(pid) or -1
+	local loc = unit:GetAbsOrigin()
+	for _, hero in ipairs(HeroList:GetAllHeroes()) do
+		if hero ~= nil and not hero:IsNull() and hero:IsRealHero() and hero:IsAlive()
+			and not (hero.IsClone and hero:IsClone()) and not (hero.IsTempestDouble and hero:IsTempestDouble())
+			and (hero:GetAbsOrigin() - loc):Length2D() <= CS_NEAR then
+			local heroTeam = hero:GetTeamNumber()
+			local heroPid = hero:GetPlayerOwnerID()
+			local row = csRow(hero:GetUnitName(), heroTeam)
+			if heroTeam ~= creepTeam then
+				row.lhNear = row.lhNear + 1
+				if pid == heroPid then row.lhLane = row.lhLane + 1
+				elseif pidTeam == heroTeam then row.lhAlly = row.lhAlly + 1
+				elseif pidTeam == creepTeam then row.lhDenied = row.lhDenied + 1
+				else row.lhMissed = row.lhMissed + 1 end
+			else
+				row.dnNear = row.dnNear + 1
+				if pid == heroPid then row.dnLane = row.dnLane + 1
+				elseif pid >= 0 and pidTeam ~= heroTeam then row.dnLost = row.dnLost + 1 end
+			end
+		end
+	end
+end
+
+-- CSREC line: the accounting rows plus the scoreboard's last hits and denies.
+local function printCsRecord(minute)
+	if R.csPrinted[minute] then return end
+	R.csPrinted[minute] = true
+	local lh, dn = lastHitsByHero(), deniesByHero()
+	local heroes = {}
+	for name, row in pairs(R.cs) do
+		local out = {}
+		for k, v in pairs(row) do out[k] = v end
+		out.lh = lh[name]
+		out.dn = dn[name]
+		heroes[name] = out
+	end
+	-- Heroes never near a dying creep (frozen in a drill, or always away) still get a row.
+	for name, v in pairs(lh) do
+		if heroes[name] == nil then heroes[name] = { lh = v, dn = dn[name], lhNear = 0, dnNear = 0 } end
+	end
+	R.snap['cs' .. minute] = heroes
+	rawPrint('CSREC ' .. encode({ t = minute * 60, near = CS_NEAR, heroes = heroes, lanes = R.laneDeaths }))
+end
+
 local function readFlags()
 	local ok, customize = pcall(require, 'bots.Customize.general')
 	if not ok or type(customize) ~= 'table' or type(customize.Behavior) ~= 'table' then
@@ -236,7 +352,10 @@ local function takeSnapshot(minute)
 		kills = killsByTeam(),
 		towers = towersByTeam(),
 	}
-	if minute == 10 then s.lh = lastHitsByHero() end
+	if minute == 10 then
+		s.lh = lastHitsByHero()
+		s.dn = deniesByHero()
+	end
 	R.snap[minute] = s
 end
 
@@ -263,6 +382,8 @@ function R:PrintRecord()
 		nw20 = snapField(20, 'nw'),
 		nwEnd = netWorthByTeam(),
 		lh10 = snapField(10, 'lh'),
+		dn10 = snapField(10, 'dn'),
+		cs10 = R.snap['cs10'],
 		seed = { source = 'MATCHSEED lines in console.log' },
 		timescale = readTimescale(),
 	}
@@ -286,6 +407,12 @@ function R:OnEntityKilled(keys)
 		rawPrint(string.format('KILLREC kind=tower team=%d by=%d t=%d name=%s', team, killerTeam, math.floor(gameTime()), unit:GetUnitName()))
 	elseif unit:GetUnitName() == 'npc_dota_roshan' then
 		rawPrint(string.format('KILLREC kind=roshan by=%d t=%d', killerTeam, math.floor(gameTime())))
+	elseif isLaneCreep(unit) and gameTime() >= 0 and gameTime() < CS_UNTIL then
+		local ok, err = pcall(countCreepDeath, unit, killer)
+		if not ok and not R.csError then
+			R.csError = true
+			rawPrint('MATCHREC_INFO creep accounting failed: ' .. tostring(err))
+		end
 	end
 end
 
@@ -304,7 +431,11 @@ function R:Think()
 	end
 	if state == DOTA_GAMERULES_STATE_GAME_IN_PROGRESS then
 		local t = gameTime()
-		if t >= 10 * 60 then takeSnapshot(10) end
+		if t >= 5 * 60 then printCsRecord(5) end
+		if t >= 10 * 60 then
+			takeSnapshot(10)
+			printCsRecord(10)
+		end
 		if t >= 20 * 60 then takeSnapshot(20) end
 	end
 	return THINK_INTERVAL

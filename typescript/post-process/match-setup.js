@@ -15,6 +15,11 @@
 //                                                Customize.Behavior.<team>.tune = { name = value, ... }, read by
 //                                                Tune() in flags.ts. Names must be in TUNES. The first summary line
 //                                                ends with " tune=name=value,..." (absent without --tune).
+//   ... --drill=solo|duel[:<pos>]                last-hit drill (bots/tools/cs_drill.lua, server side): every hero
+//                                                except the one at slot <pos> (default 2, mid) is stunned in its
+//                                                fountain. solo: only the new team's hero plays; duel: both teams'.
+//                                                Writes Customize.Drill; the first summary line ends with
+//                                                " drill=<mode>:<pos>". Fixed lineups only.
 //
 // Every setup also turns on the fight decision log (Customize.DecisionLog; FIGHTDEC / FIGHTOUT lines,
 // docs/specs/learned-fight-decisions.md), with explore 0 unless --explore is given.
@@ -51,10 +56,16 @@ let explore = 0;
 let outDir = null;
 let freeDraft = false;
 let tuneArg = null;
+let drillArg = null;
 const args = rawArgs.filter(a => {
     const t = a.match(/^--tune=(.*)$/);
     if (t) {
         tuneArg = t[1];
+        return false;
+    }
+    const dr = a.match(/^--drill=(.*)$/);
+    if (dr) {
+        drillArg = dr[1];
         return false;
     }
     const m = a.match(/^--explore=([0-9.]+)$/);
@@ -92,6 +103,15 @@ if (tuneArg !== null) {
     }
     if (!tunes.length) fail(`--tune needs at least one name=value. ${known}`);
 }
+// --drill=solo|duel[:pos]
+let drill = null;
+if (drillArg !== null) {
+    const m = drillArg.match(/^(solo|duel)(?::([1-5]))?$/);
+    if (!m) fail(`--drill takes solo or duel, optionally :<pos 1-5>, e.g. --drill=solo:2 (got "${drillArg}")`);
+    drill = { mode: m[1], pos: Number(m[2] || 2) };
+    if (freeDraft) fail("--drill needs fixed lineups (the slot is the position); drop --draft");
+}
+const drillText = drill ? ` drill=${drill.mode}:${drill.pos}` : "";
 // Lua for the tune table inside a team's Behavior row, and the summary text.
 const tuneLua = tunes.length ? `, tune = { ${tunes.map(([n, v]) => `${n} = ${String(v)}`).join(", ")} }` : "";
 const tuneText = tunes.length ? ` tune=${tunes.map(([n, v]) => `${n}=${String(v)}`).join(",")}` : "";
@@ -130,6 +150,7 @@ const setDebugMode = () => {
 };
 
 if (args[0] === "play") {
+    if (drill) fail("--drill is for measurement games (npm run match -- <game> ...), not play");
     const on = parseFlags(args[1]);
     keepBackups();
     let text = readCfg(generalPath);
@@ -203,6 +224,13 @@ general = general.replace(/(\r?\n)Customize\.Weak_Hero_Cap = [^\r\n]*/, `$1Custo
 // Customize.Draft_Seed: set for --draft, removed otherwise (no seed: drafts as before).
 general = general.replace(/\r?\nCustomize\.Draft_Seed = [^\r\n]*/g, "");
 if (draftSeed !== null) general = general.replace(/\r?\nreturn Customize/, `${nl}Customize.Draft_Seed = ${draftSeed}${nl}return Customize`);
+// Customize.Drill: set for --drill, removed otherwise. Read only by bots/tools/cs_drill.lua (server side).
+general = general.replace(/\r?\nCustomize\.Drill = [^\r\n]*/g, "");
+if (drill)
+    general = general.replace(
+        /\r?\nreturn Customize/,
+        `${nl}Customize.Drill = { mode = '${drill.mode}', team = '${newTeam}', pos = ${drill.pos} }${nl}return Customize`
+    );
 writeCfg(generalPath, withDecisionLog(general));
 
 // utils.lua: DebugMode on, for the thrash counter
@@ -213,7 +241,7 @@ if (freeDraft) {
     console.log(`  Radiant: free draft${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : "   (old)"}`);
     console.log(`  Dire:    free draft${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : "   (old)"}`);
 } else {
-    console.log(`Game ${game}: pair ${pair}, rotation ${rotation}${tuneText}`);
+    console.log(`Game ${game}: pair ${pair}, rotation ${rotation}${tuneText}${drillText}`);
     console.log(`  Radiant: lineup ${radiantSide}  ${lineup[radiantSide].join(", ")}${newTeam === "Radiant" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
     console.log(`  Dire:    lineup ${direSide}  ${lineup[direSide].join(", ")}${newTeam === "Dire" ? `   <- NEW (${flagsOn.join(", ")})` : ""}`);
 }

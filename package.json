@@ -21,6 +21,7 @@
         "test": "node ./typescript/tests/talk.test.js",
         "fun": "node ./typescript/post-process/fun.js",
         "diagnose": "node ./typescript/post-process/diagnose.js",
+        "cs": "node ./typescript/post-process/cs.js",
         "herorates": "node ./typescript/post-process/hero-rates.js",
         "dev": "tstl -p tsconfig-tstl.json --watch",
         "prettier": "prettier ./bots ./typescript --write",
