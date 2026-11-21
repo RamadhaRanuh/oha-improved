@@ -462,7 +462,7 @@ function MakePlan(bot: Unit): number {
         const left = HealthAt(c.creep, Timeline(c.creep, attackers, at + 0.1), at);
         if (left > 0 && left + HP_MARGIN <= OurDamage(bot, c.creep)) {
             plans[id] = { act: "keep", creep: c.creep };
-            Note(bot, c.creep, "mine");
+            if (c.act === "hit") Note(bot, c.creep, "mine"); // a deny is not a last hit (LHWHY counts enemy creeps)
             return HIT_DESIRE;
         }
         commits[id] = undefined;
@@ -492,8 +492,8 @@ function MakePlan(bot: Unit): number {
                 return HIT_DESIRE;
             }
             plans[id] = { act: c.act, creep: c.creep };
-            NoteAll(bot, "busy_commit");
-            Note(bot, c.creep, "mine");
+            NoteAll(bot, c.act === "deny" ? "busy_deny" : "busy_commit");
+            if (c.act === "hit") Note(bot, c.creep, "mine");
             return HIT_DESIRE;
         }
     }

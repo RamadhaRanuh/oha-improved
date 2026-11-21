@@ -746,7 +746,9 @@ local function MakePlan(bot)
         )
         if left > 0 and left + HP_MARGIN <= OurDamage(bot, c.creep) then
             plans[id] = {act = "keep", creep = c.creep}
-            Note(bot, c.creep, "mine")
+            if c.act == "hit" then
+                Note(bot, c.creep, "mine")
+            end
             return HIT_DESIRE
         end
         commits[id] = nil
@@ -781,8 +783,10 @@ local function MakePlan(bot)
                 return HIT_DESIRE
             end
             plans[id] = {act = c.act, creep = c.creep}
-            NoteAll(bot, "busy_commit")
-            Note(bot, c.creep, "mine")
+            NoteAll(bot, c.act == "deny" and "busy_deny" or "busy_commit")
+            if c.act == "hit" then
+                Note(bot, c.creep, "mine")
+            end
             return HIT_DESIRE
         end
     end
@@ -821,22 +825,22 @@ local function MakePlan(bot)
         end
         for ____, tw in ipairs(enemyTowers) do
             do
-                local __continue114
+                local __continue116
                 repeat
                     if not tw:IsAlive() or Dist(
                         tw:GetLocation(),
                         loc
                     ) > TOWER_NEAR then
-                        __continue114 = true
+                        __continue116 = true
                         break
                     end
                     local shot = tw:GetAttackTarget()
                     if hp < TOWER_HP or shot == nil or shot == nil or shot == bot or shot:IsHero() then
                         return note("tower")
                     end
-                    __continue114 = true
+                    __continue116 = true
                 until true
-                if not __continue114 then
+                if not __continue116 then
                     break
                 end
             end
